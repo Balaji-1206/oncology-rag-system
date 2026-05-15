@@ -1,0 +1,402 @@
+import numpy as np
+import requests
+import json
+import re
+from functools import lru_cache
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+from nltk.translate.gleu_score import sentence_gleu
+from rouge_score import rouge_scorer
+from bert_score import score as bert_score
+from sentence_transformers import util
+from nltk.translate.meteor_score import meteor_score
+from nltk.tokenize import word_tokenize
+
+from modules.embeddings.mrl_embeddings import (
+    get_mrl_embedding,
+    prime_mrl_embedding_cache
+)
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+EVAL_MODEL = "phi3:mini"
+
+smooth = SmoothingFunction().method1
+rouge = rouge_scorer.RougeScorer(
+    ['rouge1', 'rouge2', 'rougeL', 'rougeLsum'],
+    use_stemmer=True
+)
+
+_combined_llm_cache = {}
+
+
+@lru_cache(maxsize=20000)
+def cached_lower(text):
+
+    return text.lower()
+
+
+@lru_cache(maxsize=20000)
+def cached_split_tokens(text):
+
+    return tuple(
+        text.lower().split()
+    )
+
+
+def prepare_metric_embeddings(
+    question,
+    reference,
+    prediction,
+    contexts
+):
+
+    context_text = " ".join(
+        contexts
+    )
+
+    texts = [
+        question,
+        reference,
+        prediction,
+        context_text
+    ]
+
+    texts.extend(
+        contexts
+    )
+
+    prime_mrl_embedding_cache(
+        [
+            text
+            for text in texts
+            if text and text.strip()
+        ]
+    )
+
+
+# -------------------------------
+# 🔹 GENERATION METRICS
+# -------------------------------
+def compute_bleu_scores(ref, pred):
+    try:
+        ref_tokens = ref.split()
+        pred_tokens = pred.split()
+        return {
+            "bleu1": sentence_bleu([ref_tokens], pred_tokens, weights=(1, 0, 0, 0), smoothing_function=smooth),
+            "bleu2": sentence_bleu([ref_tokens], pred_tokens, weights=(0.5, 0.5, 0, 0), smoothing_function=smooth),
+            "bleu4": sentence_bleu([ref_tokens], pred_tokens, smoothing_function=smooth),
+        }
+    except Exception:
+        return {"bleu1": 0.0, "bleu2": 0.0, "bleu4": 0.0}
+
+def compute_gleu_score(ref, pred):
+    try:
+        ref_tokens = ref.split()
+        pred_tokens = pred.split()
+        if not pred_tokens:
+            return {"gleu": 0.0}
+        return {"gleu": sentence_gleu([ref_tokens], pred_tokens)}
+    except Exception:
+        return {"gleu": 0.0}
+
+def compute_distinct_scores(pred):
+    try:
+        tokens = pred.lower().split()
+        if len(tokens) < 2:
+            return {"distinct1": 0.0, "distinct2": 0.0}
+
+        unigrams = set(tokens)
+        bigrams = set(zip(tokens[:-1], tokens[1:]))
+
+        return {
+            "distinct1": len(unigrams) / len(tokens),
+            "distinct2": len(bigrams) / max(len(tokens) - 1, 1)
+        }
+    except Exception:
+        return {"distinct1": 0.0, "distinct2": 0.0}
+
+def compute_accuracy_f1(ref, pred):
+    try:
+        ref_tokens = set(ref.lower().split())
+        pred_tokens = set(pred.lower().split())
+
+        if not ref_tokens and not pred_tokens:
+            return {"accuracy": 1.0, "f1": 1.0}
+        if not ref_tokens or not pred_tokens:
+            return {"accuracy": 0.0, "f1": 0.0}
+
+        overlap = len(ref_tokens & pred_tokens)
+        precision = overlap / len(pred_tokens)
+        recall = overlap / len(ref_tokens)
+
+        f1 = 0.0 if (precision + recall) == 0 else (2 * precision * recall) / (precision + recall)
+        accuracy = float(ref.strip().lower() == pred.strip().lower())
+
+        return {"accuracy": accuracy, "f1": f1}
+    except Exception:
+        return {"accuracy": 0.0, "f1": 0.0}
+
+def compute_rouge_scores(ref, pred):
+    try:
+        scores = rouge.score(ref, pred)
+        return {
+            "rouge1": scores["rouge1"].fmeasure,
+            "rouge2": scores["rouge2"].fmeasure,
+            "rougeL": scores["rougeL"].fmeasure,
+            "rougeLsum": scores["rougeLsum"].fmeasure
+        }
+    except Exception:
+        return {"rouge1": 0.0, "rouge2": 0.0, "rougeL": 0.0, "rougeLsum": 0.0}
+
+def compute_bertscore(refs, preds):
+    try:
+        P, R, F1 = bert_score(preds, refs, lang="en", verbose=False)
+        return float(F1.mean())
+    except Exception:
+        return 0.0
+
+def compute_meteor_score(ref, pred):
+    try:
+        return {"meteor": meteor_score([word_tokenize(ref)], word_tokenize(pred))}
+    except Exception:
+        return {"meteor": 0.0}
+
+def compute_sbert_similarity(ref, pred):
+    if not ref.strip() or not pred.strip():
+        return 0.0
+    try:
+        embeddings = get_mrl_embedding(
+            [ref, pred],
+            log=False
+        )
+        return float(util.cos_sim(embeddings[0], embeddings[1]).item())
+    except Exception as e:
+        print("SBERT similarity failed:", e)
+        return 0.0
+
+def combined_llm_evaluation(question, reference, prediction):
+
+    cache_key = (
+        question,
+        reference,
+        prediction
+    )
+
+    if cache_key in _combined_llm_cache:
+
+        return _combined_llm_cache[cache_key]
+
+    prompt = f"""
+You are an evaluator for an oncology QA system.
+
+Evaluate the prediction against the reference answer using BOTH:
+1. A general LLM-as-judge score from 0.0 to 1.0.
+2. The S.C.O.P.E framework from 1.0 to 5.0 for each metric:
+- Safety
+- Completeness
+- Originality
+- Precision
+- Efficiency
+
+Return ONLY valid JSON:
+{{
+  "llm_judge_score": 0.0,
+  "llm_judge_reason": "short reason",
+  "scope_safety": 0.0,
+  "scope_completeness": 0.0,
+  "scope_originality": 0.0,
+  "scope_precision": 0.0,
+  "scope_efficiency": 0.0
+}}
+
+QUESTION:
+{question}
+
+REFERENCE:
+{reference[:1200]}
+
+PREDICTION:
+{prediction[:1200]}
+"""
+    try:
+        response = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": EVAL_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json",
+                "options": {
+                    "temperature": 0,
+                    "top_p": 0.1,
+                    "num_predict": 220,
+                    "keep_alive": "20m"
+                }
+            },
+            timeout=60
+        )
+        raw = response.json().get("response", "")
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON judge output")
+        parsed = json.loads(match.group(0))
+
+        judge_score = float(parsed.get("llm_judge_score", 0))
+        safety = float(parsed.get("scope_safety", 0))
+        completeness = float(parsed.get("scope_completeness", 0))
+        originality = float(parsed.get("scope_originality", 0))
+        precision = float(parsed.get("scope_precision", 0))
+        efficiency = float(parsed.get("scope_efficiency", 0))
+        weighted = np.mean([safety, completeness, originality, precision, efficiency])
+
+        result = {
+            "llm_judge_score": max(0, min(judge_score, 1)),
+            "llm_judge_reason": str(parsed.get("llm_judge_reason", ""))[:240],
+            "scope_safety": round(max(1.0, min(safety, 5.0)), 2),
+            "scope_completeness": round(max(1.0, min(completeness, 5.0)), 2),
+            "scope_originality": round(max(1.0, min(originality, 5.0)), 2),
+            "scope_precision": round(max(1.0, min(precision, 5.0)), 2),
+            "scope_efficiency": round(max(1.0, min(efficiency, 5.0)), 2),
+            "scope_weighted_total": round(max(1.0, min(weighted, 5.0)), 2)
+        }
+
+        _combined_llm_cache[cache_key] = result
+
+        return result
+
+    except Exception as e:
+
+        print("Combined LLM evaluation failed:", e)
+
+        result = {
+            "llm_judge_score": 0.0,
+            "llm_judge_reason": "judge_failed",
+            "scope_safety": 0.0,
+            "scope_completeness": 0.0,
+            "scope_originality": 0.0,
+            "scope_precision": 0.0,
+            "scope_efficiency": 0.0,
+            "scope_weighted_total": 0.0
+        }
+
+
+        _combined_llm_cache[cache_key] = result
+
+        return result
+
+
+def llm_as_judge_score(question, reference, prediction):
+
+    result = combined_llm_evaluation(
+        question,
+        reference,
+        prediction
+    )
+
+    return {
+        "llm_judge_score": result.get(
+            "llm_judge_score",
+            0.0
+        ),
+        "llm_judge_reason": result.get(
+            "llm_judge_reason",
+            "judge_failed"
+        )
+    }
+
+
+def scope_llm_judge(question, reference, prediction):
+
+    result = combined_llm_evaluation(
+        question,
+        reference,
+        prediction
+    )
+
+    return {
+        "scope_safety": result.get("scope_safety", 0.0),
+        "scope_completeness": result.get("scope_completeness", 0.0),
+        "scope_originality": result.get("scope_originality", 0.0),
+        "scope_precision": result.get("scope_precision", 0.0),
+        "scope_efficiency": result.get("scope_efficiency", 0.0),
+        "scope_weighted_total": result.get("scope_weighted_total", 0.0)
+    }
+
+# -------------------------------
+# 🔹 RETRIEVAL METRICS
+# -------------------------------
+def precision_at_k(pred_ids, gt_ids, k=5):
+    try:
+        if not pred_ids: return 0.0
+        return len(set(pred_ids[:k]) & set(gt_ids)) / k
+    except Exception: return 0.0
+
+def recall_at_k(pred_ids, gt_ids, k=5):
+    try:
+        if not gt_ids: return 0.0
+        return len(set(pred_ids[:k]) & set(gt_ids)) / len(gt_ids)
+    except Exception: return 0.0
+
+def mrr(pred_ids, gt_ids):
+    try:
+        for i, pid in enumerate(pred_ids):
+            if pid in gt_ids:
+                return 1.0 / (i + 1)
+        return 0.0
+    except Exception: return 0.0
+
+def hit_rate(pred_ids, gt_ids):
+    try:
+        return float(int(any(pid in gt_ids for pid in pred_ids)))
+    except Exception: return 0.0
+
+def ndcg(pred_ids, gt_ids, k=5):
+    try:
+        dcg = 0.0
+        for i, pid in enumerate(pred_ids[:k]):
+            if pid in gt_ids:
+                dcg += 1.0 / np.log2(i + 2)
+        ideal = sum(1.0 / np.log2(i + 2) for i in range(min(len(gt_ids), k)))
+        return dcg / ideal if ideal > 0 else 0.0
+    except Exception: return 0.0
+
+# -------------------------------
+# 🔹 FAITHFULNESS & RELEVANCE
+# -------------------------------
+def compute_faithfulness(answer, contexts):
+    try:
+        context_text = cached_lower(
+            " ".join(contexts)
+        )
+        answer_words = set(
+            cached_split_tokens(answer)
+        )
+        if not answer_words: return 0.0
+        overlap = sum(1 for w in answer_words if w in context_text)
+        return overlap / len(answer_words)
+    except Exception: return 0.0
+
+def answer_relevance(answer, question):
+    try:
+        q_words = set(
+            cached_split_tokens(question)
+        )
+        a_words = set(
+            cached_split_tokens(answer)
+        )
+        if not q_words: return 0.0
+        overlap = len(q_words & a_words)
+        return overlap / len(q_words)
+    except Exception: return 0.0
+
+def context_relevance(contexts, question):
+    try:
+        context_text = cached_lower(
+            " ".join(contexts)
+        )
+        q_words = set(
+            cached_split_tokens(question)
+        )
+        if not q_words: return 0.0
+        overlap = sum(1 for w in q_words if w in context_text)
+        return overlap / len(q_words)
+    except Exception: return 0.0

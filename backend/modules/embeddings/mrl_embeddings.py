@@ -1,0 +1,278 @@
+import os
+import time
+import numpy as np
+from threading import Lock
+
+from sentence_transformers import (
+    SentenceTransformer
+)
+
+import settings
+
+
+# =========================================================
+# GLOBAL MODEL
+# =========================================================
+_model = None
+_embedding_cache = {}
+_cache_lock = Lock()
+
+MRL_MODEL_NAME = "nomic-ai/nomic-embed-text-v1.5"
+
+
+# =========================================================
+# LOAD MODEL
+# =========================================================
+def get_model():
+
+    global _model
+
+    if _model is None:
+
+        print(
+            "Loading embedding model ONCE..."
+        )
+
+        os.environ[
+            "TOKENIZERS_PARALLELISM"
+        ] = "false"
+
+        _model = SentenceTransformer(
+            MRL_MODEL_NAME,
+            device="cuda",
+            trust_remote_code=True
+        )
+
+    return _model
+
+
+# =========================================================
+# MRL EMBEDDINGS
+# =========================================================
+def get_mrl_embedding(
+    texts,
+    dim=None,
+    use_cache=True,
+    show_progress_bar=False,
+    log=True
+):
+
+    model = get_model()
+
+    if isinstance(texts, str):
+
+        texts = [texts]
+
+    texts = list(texts)
+
+    requested_dim = dim
+
+    if requested_dim is None:
+
+        requested_dim = settings.effective_embedding_dimension()
+
+    total = len(texts)
+
+    if total == 0:
+
+        return np.empty(
+            (0, requested_dim),
+            dtype=np.float32
+        )
+
+    cached = {}
+
+    missing = []
+
+    missing_keys = []
+
+    if use_cache:
+
+        with _cache_lock:
+
+            for text in texts:
+
+                key = (
+                    requested_dim,
+                    text
+                )
+
+                if key in _embedding_cache:
+
+                    cached[key] = _embedding_cache[key]
+
+                else:
+
+                    missing.append(text)
+
+                    missing_keys.append(key)
+
+    else:
+
+        missing = texts
+
+        missing_keys = [
+            (
+                requested_dim,
+                text
+            )
+            for text in texts
+        ]
+
+    if log and missing:
+
+        print(
+            f"Embedding uncached texts: {len(missing)} "
+            f"(requested={total}, dim={requested_dim})"
+        )
+
+    start = time.time()
+
+    if missing:
+
+        encoded = model.encode(
+            missing,
+            batch_size=16,
+            show_progress_bar=show_progress_bar,
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
+
+        if settings.is_mrl_enabled():
+
+            if encoded.shape[1] < requested_dim:
+
+                raise ValueError(
+                    f"Requested MRL dimension {requested_dim}, "
+                    f"but model returned {encoded.shape[1]} dimensions"
+                )
+
+            encoded = encoded[:, :requested_dim]
+
+        else:
+
+            requested_dim = encoded.shape[1]
+
+            if requested_dim != settings.FULL_EMBEDDING_DIMENSION:
+
+                print(
+                    "WARNING: Full embedding dimension from model "
+                    f"is {requested_dim}; configured fallback is "
+                    f"{settings.FULL_EMBEDDING_DIMENSION}."
+                )
+
+        encoded = np.array(
+            encoded,
+            dtype=np.float32
+        )
+
+        if use_cache:
+
+            with _cache_lock:
+
+                for key, vector in zip(
+                    missing_keys,
+                    encoded
+                ):
+
+                    key = (
+                        requested_dim,
+                        key[1]
+                    )
+
+                    _embedding_cache[key] = vector
+
+                    cached[key] = vector
+
+        else:
+
+            for key, vector in zip(
+                missing_keys,
+                encoded
+            ):
+
+                key = (
+                    requested_dim,
+                    key[1]
+                )
+
+                cached[key] = vector
+
+    vectors = [
+        cached[
+            (
+                requested_dim,
+                text
+            )
+        ]
+        for text in texts
+    ]
+
+    embeddings = np.vstack(
+        vectors
+    ).astype(
+        np.float32,
+        copy=False
+    )
+
+    elapsed = round(
+        time.time() - start,
+        2
+    )
+
+    if log:
+
+        print(
+            f"Embeddings ready in {elapsed}s"
+        )
+
+        print(
+            f"Final embedding shape: {embeddings.shape}"
+        )
+
+    return embeddings
+
+
+def prime_mrl_embedding_cache(
+    texts,
+    dim=None
+):
+
+    return get_mrl_embedding(
+        texts,
+        dim=dim,
+        use_cache=True,
+        show_progress_bar=False,
+        log=False
+    )
+
+
+# =========================================================
+# DYNAMIC MRL
+# =========================================================
+def get_dynamic_mrl_embedding(
+    texts,
+    intent="factual"
+):
+
+    active_dim = settings.effective_embedding_dimension()
+
+    if settings.is_mrl_enabled():
+
+        print(
+            f"Using MRL dimension: {active_dim}"
+        )
+
+    else:
+
+        print(
+            f"MRL disabled: using full embedding dimension {active_dim}"
+        )
+
+    return get_mrl_embedding(
+        texts,
+        dim=active_dim,
+        use_cache=True,
+        show_progress_bar=False,
+        log=False
+    )

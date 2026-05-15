@@ -1,0 +1,6 @@
+{
+  "enable_laqa": true,
+  "enable_mrl": true,
+  "full_embedding_dimension": 768,
+  "mrl_dimension": 512
+}

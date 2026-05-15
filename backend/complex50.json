@@ -1,0 +1,352 @@
+[
+  {
+    "id": "Q001",
+    "q": "What specific genetic fusion and its associated prevalence are pathognomonic for secretory carcinoma of the salivary gland?",
+    "a": "Secretory carcinoma of the salivary gland is characterized by a t(12;15)(p13;q25) translocation resulting in an ETV6::NTRK3 fusion, which is present in over 90% of cases [1].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q002",
+    "q": "In acinic cell carcinoma of the head and neck, which chromosomal region and specific gene fusion or activation are predominantly implicated?",
+    "a": "Acinic cell carcinoma is predominantly associated with the 9q31 chromosomal region, specifically featuring an NR4A3 fusion or activation in approximately 86% of cases [1].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q003",
+    "q": "What is the prognostic significance of a 'worst pattern of invasion' (WPOI) score of 5 in oral squamous cell carcinoma?",
+    "a": "A worst pattern of invasion 5, defined by tumor satellites spreading far from the main tumor, is a severe adverse prognostic factor with a Hazard Ratio of 2.77 compared to WPOI 1 to 4 [2].",
+    "category": "prognosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q004",
+    "q": "Which genetic mutations and fusions respectively define the classic and cribriform subtypes of polymorphous adenocarcinoma?",
+    "a": "The classic subtype is driven by 14q12 PRKD1 mutations in 73% of cases, whereas the cribriform subtype is frequently associated with PRKD1 (38%), PRKD2 (14%), and PRKD3 (19%) fusions [3].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q005",
+    "q": "Which specific translocation and resulting fusion gene define microsecretory adenocarcinoma of the salivary glands?",
+    "a": "Microsecretory adenocarcinoma is defined by a t(5q14.3)(18q11.2) translocation, which results in the MEF2C::SS18 fusion gene in >90% of cases [1].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q006",
+    "q": "In adenoid cystic carcinoma of the head and neck, what is the most common genetic alteration and its frequency?",
+    "a": "The most common genetic alteration is the MYB fusion, activation, or amplification at chromosomal region 6q22-23, observed in approximately 80% of cases [1].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q007",
+    "q": "How does the tumor-stroma ratio impact disease-specific survival (DSS) in deeply invasive oral squamous cell carcinoma?",
+    "a": "A tumor-stroma ratio featuring >50% stroma in a deeply invasive tumor correlates with a significantly worse DSS, demonstrating a Hazard Ratio of 2.10 (95% CI 1.56–2.84) [2].",
+    "category": "prognosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q008",
+    "q": "What are the distinct histological and behavioral characteristics of carcinoma cuniculatum in the oral cavity?",
+    "a": "Carcinoma cuniculatum is very well-differentiated, lacks cytological malignancy, exhibits a burrowing invasion pattern, and causes destructive bone invasion but does not metastasize [4].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q009",
+    "q": "Describe the histological hallmarks and clinical behavior of basaloid squamous cell carcinoma in the head and neck.",
+    "a": "It presents as islands of basaloid cells with frequent comedo necrosis and a high mitotic rate, behaving as an aggressive high-grade carcinoma that often metastasizes [4].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q010",
+    "q": "What immunohistochemical marker profile distinguishes a Ventana SP142 assay score of TC3 or IC3 for PD-L1 expression?",
+    "a": "A TC3 score indicates PD-L1 expression on >=50% of tumor cells, while an IC3 score indicates expression on >=10% of tumor-infiltrating immune cells [5].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q011",
+    "q": "What objective response rate and Grade 3-4 toxicity rate were observed with the Nivolumab and Ipilimumab combination in the CheckMate 067 trial?",
+    "a": "The combination of Nivolumab and Ipilimumab yielded an objective response rate of 58% and a Grade 3-4 treatment-related adverse event rate of 59% [6].",
+    "category": "treatment",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q012",
+    "q": "How does the presence of high mutational burden (TMB) influence the tumor microenvironment to favor immune checkpoint inhibitor response?",
+    "a": "High mutational burden tumors are enriched in non-synonymous mutation-associated neoantigens (MANAs), making the tumor more immunogenic and highly visible to CD8+ T cells [7].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q013",
+    "q": "What role do myeloid-derived suppressor cells (MDSCs) play in immune evasion within the hepatocellular carcinoma microenvironment?",
+    "a": "Recruited by chronic inflammation and hypoxia, MDSCs produce nitric oxide and collaborate with regulatory T cells to facilitate tumor immune escape and resistance to checkpoint blockade [7, 8].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q014",
+    "q": "How is the 'alpha/beta parameter' utilized within the linear-quadratic (LQ) model for radiotherapy planning?",
+    "a": "The alpha/beta parameter accounts for the biological heterogeneity of tissues, distinguishing between fast-dividing cells and slow-turnover tissues to predict cell survival dependencies based on radiation dosage [9, 10].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q015",
+    "q": "What genetic fusion is characteristic of Chronic Myelogenous Leukemia (CML), and how is it formed?",
+    "a": "CML is defined by the BCR-ABL fusion gene, which is generated from a reciprocal chromosomal translocation t(9;22) producing an altered transcript with a novel oncogenic meaning [11].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q016",
+    "q": "How do Amsterdam II criteria differ from Amsterdam I criteria in the clinical diagnosis of Hereditary Nonpolyposis Colorectal Cancer (HNPCC)?",
+    "a": "Amsterdam II expands beyond colorectal cancer to include any combination of HNPCC-associated cancers, such as endometrial, ovarian, brain, small bowel, or hepatobiliary tract tumors [12].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q017",
+    "q": "What is the clinical significance of a 1p/19q chromosomal deletion in oligodendroglioma?",
+    "a": "The 1p/19q co-deletion in oligodendroglioma serves as a predictive biomarker indicating both enhanced chemosensitivity and a significantly better overall patient survival [13, 14].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q018",
+    "q": "Explain the mechanism behind genetic pro-drug activation therapy utilizing CB1954.",
+    "a": "An introduced gene encodes an enzyme (like E. coli nitroreductase) that selectively converts the systemically administered, non-toxic pro-drug CB1954 into a highly toxic alkylating agent, nitrobenzamidine, which cross-links DNA [15].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q019",
+    "q": "Why is testing for thiopurine methyltransferase and dihydropyridine dehydrogenase levels critical before administering specific chemotherapies?",
+    "a": "Deficiencies in thiopurine methyltransferase predict severe toxicity from 6-mercaptopurine, while dihydropyridine dehydrogenase deficiency leads to significantly increased and potentially fatal toxicity from fluoropyrimidines [16].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q020",
+    "q": "According to the NCIC Common Toxicity Criteria, what clinical manifestations define a Grade 4 late radiation morbidity in the esophagus?",
+    "a": "Grade 4 late radiation morbidity in the esophagus is strictly defined by the presence of severe complications like necrosis, perforation, or fistula formation [17].",
+    "category": "side_effects",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q021",
+    "q": "What clinical findings constitute Grade 4 radiation dermatitis according to the NCIC CTC grading system?",
+    "a": "Grade 4 radiation dermatitis involves skin necrosis or ulceration of the full-thickness dermis, which may include bleeding not induced by minor trauma or abrasion [18].",
+    "category": "side_effects",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q022",
+    "q": "How does the presence of the UGT1A1*28 allele affect irinotecan metabolism and patient safety?",
+    "a": "Homozygous deficiencies in the UGT1A1 pathway (UGT1A1*28 allele) severely decrease the elimination of irinotecan's active metabolite (SN-38), sharply increasing the risk of life-threatening diarrhea and myelosuppression [19].",
+    "category": "side_effects",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q023",
+    "q": "What is the precise mechanism by which topoisomerase II (Top2) inhibitors like etoposide induce cytotoxicity?",
+    "a": "Top2 inhibitors induce cytotoxicity by trapping Top2 cleavage complexes, leading to DNA double-strand breaks through the disruption of the Top2 dimer interface, or by the Top2 homodimer interface being disjoined by mechanical tension [19].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q024",
+    "q": "Which specific gene mutation is heavily implicated in familial atypical multiple mole melanoma (FAMMM) syndrome, and what is the cumulative risk by age 75?",
+    "a": "FAMMM syndrome is driven by CDKN2A gene mutations, conferring an estimated cumulative risk for pancreatic cancer of 17% by age 75 years [20].",
+    "category": "epidemiology",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q025",
+    "q": "What genetic mutation defines Peutz-Jeghers syndrome and what is its associated lifetime risk for pancreatic cancer?",
+    "a": "Peutz-Jeghers syndrome is caused by inherited mutations in the STK11 gene, which carries a cumulative pancreatic cancer risk of 32–36% by age 70 years [20].",
+    "category": "epidemiology",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q026",
+    "q": "Beyond CTCs and ctDNA, what other analytes are encompassed within the modern definition of a 'liquid biopsy'?",
+    "a": "Modern liquid biopsies also evaluate circulating non-coding nucleic acids such as microRNAs (miRNAs) and long non-coding RNAs (lncRNAs), extracellular vesicles (exosomes), and tumour-educated platelets [21, 22].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q027",
+    "q": "What are the primary technical disadvantages and limitations of using next-generation sequencing (NGS) for mutation detection in oncology?",
+    "a": "NGS requires costly investments in instrumentation and bioinformatics, suffers from higher error rates for insertion and deletion mutations, and has a limited ability to accurately sequence GC-rich regions [23].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q028",
+    "q": "How does pyrosequencing differ analytically from traditional Sanger sequencing in cancer molecular diagnostics?",
+    "a": "Pyrosequencing provides higher analytical sensitivity and quantitative information about mutation levels compared to Sanger sequencing, though its short read lengths strictly limit its application to mutational hotspots [14, 24].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q029",
+    "q": "What characterizes the 'Intermediate prognosis' category for nonseminomatous germ cell tumors based on serum tumor markers?",
+    "a": "Intermediate prognosis requires a testis/retroperitoneal primary with no nonpulmonary visceral metastases, and marker levels of AFP 1,000–10,000 ng/ml OR HCG 1,000–10,000 ng/ml [25].",
+    "category": "prognosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q030",
+    "q": "What is the specific role of the Human Development Index (HDI) in global cancer epidemiology, and what parameters does it combine?",
+    "a": "The HDI assesses national cancer transitions by measuring achievement in three core dimensions: life expectancy at birth, acquiring knowledge (years of schooling), and standard of living based on gross national income per capita [26].",
+    "category": "epidemiology",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q031",
+    "q": "In the context of the REVEAL study, what clinical and virological predictors constitute the HCC risk score for anti-HCV-seropositive patients?",
+    "a": "The robust risk predictors for HCC in anti-HCV-seropositive patients include patient age, serum ALT level, serum AST/ALT ratio, cirrhosis status, HCV RNA level, and HCV genotype [27].",
+    "category": "epidemiology",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q032",
+    "q": "How do E-cadherin (CDH1) epigenetic alterations and mutations serve as biomarkers in gastric cancer?",
+    "a": "CDH1 alterations serve as diagnostic and prognostic biomarkers detectable in both tissue and blood, reflecting severe disruptions in cell adhesion molecules critical for tumor invasion and early metastasis [28].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q033",
+    "q": "What distinct genomic alterations differentiate the Epstein-Barr virus-positive (EBV+) subtype of gastric cancer from the genomically stable (GS) subtype?",
+    "a": "The EBV+ subtype exhibits extreme DNA hypermethylation and JAK2/PD-L1 amplification, whereas the GS subtype features low overall mutation rates but recurring mutations in CDH1, RHOA, and ARID1A [29].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q034",
+    "q": "What specific analytical vulnerabilities exist when utilizing circulating cell-free tumour DNA (ctDNA) for early cancer screening in asymptomatic populations?",
+    "a": "Vulnerabilities include the extremely low concentrations of ctDNA released in early-stage disease and the substantial risk of false positives resulting from comorbid inflammatory conditions common in ageing individuals [30].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q035",
+    "q": "In the FAB classification of acute myelogenous leukemia, what immunophenotypic markers identify M7 (acute megakaryoblastic leukemia)?",
+    "a": "M7 is uniquely identified by the expression of CD41/61 and CD42, along with variable expression of CD34, CD36, and CD117, while typically completely lacking HLA-DR and MPO (CD65) expression [31].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q036",
+    "q": "How is a Q-TWiST analysis uniquely applied to measure outcomes in oncology clinical trials?",
+    "a": "Q-TWiST (Quality-adjusted Time Without Symptoms of disease or Toxicity) integrates quality of life by statistically adjusting overall survival time based on periods characterized by treatment toxicity or disease symptoms to yield a quality-adjusted equivalent [32, 33].",
+    "category": "general",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q037",
+    "q": "What is the clinical significance of detecting the TMPRSS2:ERG rearrangement in prostate cancer?",
+    "a": "The TMPRSS2:ERG gene fusion acts as an oncogenic driver and a powerful prognostic biomarker that, along with ERG overexpression, tightly correlates with specific adverse prostate cancer outcomes [34].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q038",
+    "q": "How do epigenetic alterations to the MLH1 gene contribute to colorectal cancer pathogenesis in the absence of a germline mutation?",
+    "a": "In sporadic colorectal cancers, hypermethylation of the MLH1 promoter silences its expression, leading directly to a profound deficiency in DNA mismatch repair (dMMR) and resultant microsatellite instability (MSI-H) [35, 36].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q039",
+    "q": "Why is the determination of perineural invasion (PNI) in head and neck SCC considered subject to large interobserver variability despite its prognostic value?",
+    "a": "While strictly defined as tumor cells involving at least one-third of the nerve circumference or penetrating any of the three nerve sheath layers, varying morphological distortions and non-standardized descriptive practices make consistent detection highly subjective [37].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q040",
+    "q": "What is the primary analytical advantage of utilizing the SNaPshot (Single nucleotide extension) assay in molecular oncology?",
+    "a": "The SNaPshot assay allows for highly multiplexed, simultaneous detection of specific, targeted single nucleotide substitution mutations across small gene panels with very high analytic sensitivity [14].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q041",
+    "q": "What specific alterations dictate the administration of targeted therapies in systemic mastocytosis and myeloproliferative neoplasms, respectively?",
+    "a": "Targeted therapies in systemic mastocytosis are guided by the KIT D816V mutation, whereas therapies for myeloproliferative neoplasms are predicated on the presence of JAK2 V617F and MPL mutations [14, 38].",
+    "category": "treatment",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q042",
+    "q": "How do frameshift or non-sense mutations in the APC gene relate to testing methodology in Familial Adenomatous Polyposis (FAP)?",
+    "a": "Because the APC gene is very large and its pathogenic alterations are predominantly frameshift or non-sense mutations, specialized protein truncation assays are uniquely suitable and efficient for initial mutation screening in FAP [39].",
+    "category": "biomarker",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q043",
+    "q": "What are the criteria for defining 'Progressive Disease' (PD) according to RECIST v1.1 guidelines during immunotherapy?",
+    "a": "In RECIST v1.1, Progressive Disease requires at least a 20% increase in the sum of the longest diameters of measurable lesions compared to baseline, or the unequivocal appearance of new disease lesions [8].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q044",
+    "q": "Why is the concept of pseudo-progression critical when utilizing iRECIST criteria for patients on immune checkpoint inhibitors?",
+    "a": "Immune checkpoint inhibitors can cause a temporary increase in tumor size due to inflammatory immune-cell infiltration (pseudo-progression); iRECIST therefore requires an unconfirmed progressive disease (iUPD) status to be reassessed to prevent premature cessation of effective therapy [40].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q045",
+    "q": "In pediatric oncology, how is PRETEXT staging utilized in the management of hepatoblastoma?",
+    "a": "PRETEXT (PRE-Treatment EXTent of disease) staging maps the tumor extent across the four sectors of the liver based solely on initial imaging, strictly guiding the stratification into risk groups and determining the required neoadjuvant chemotherapy regimen [41].",
+    "category": "staging",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q046",
+    "q": "What is the clinical application of measuring urinary electrolyte wasting, such as in Fanconi's syndrome, during oncology treatment?",
+    "a": "Urinary electrolyte wasting is graded under the renal/genitourinary category in the NCIC CTC and serves to monitor severe renal tubular acidosis induced by nephrotoxic chemotherapeutics, helping adjust treatment before life-threatening systemic collapse occurs [42].",
+    "category": "side_effects",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q047",
+    "q": "How does the revised WHO classification define malignant tumors of the central nervous system?",
+    "a": "The revised WHO classification represents a paradigm shift by integrating complex molecular data alongside traditional microscopic histology in defining and categorizing central nervous system tumor types [43].",
+    "category": "diagnosis",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q048",
+    "q": "What defines 'Catastrophic bleeding' (Grade 4 Hemorrhage) associated with severe thrombocytopenia under the NCIC toxicity criteria?",
+    "a": "It is defined as life-threatening bleeding requiring major non-elective surgical intervention or causing severe hemodynamic collapse, occurring alongside a Grade 3 or 4 thrombocytopenia [44, 45].",
+    "category": "side_effects",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q049",
+    "q": "How does the 'tumor flare' syndrome clinically manifest following the initiation of oncologic therapy?",
+    "a": "Tumor flare manifests as a constellation of severe symptoms including sudden intense tumor pain, visible inflammation or swelling of the tumor, hypercalcemia, and diffuse bone pain immediately following the initiation of systemic therapies like anti-estrogens [42, 46].",
+    "category": "side_effects",
+    "difficulty": "complex"
+  },
+  {
+    "id": "Q050",
+    "q": "How does the relative abundance of the microbiome taxa shift from chronic gastritis to gastric carcinoma?",
+    "a": "While Helicobacter spp. decreases significantly in abundance in gastric carcinoma compared to chronic gastritis, the overall prevalence of Non-Helicobacter Proteobacteria and Actinobacteria substantially and paradoxically increases [47].",
+    "category": "mechanism",
+    "difficulty": "complex"
+  }
+]

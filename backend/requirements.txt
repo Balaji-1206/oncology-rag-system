@@ -1,0 +1,13 @@
+flask
+flask-cors
+requests
+numpy
+faiss-cpu
+rank-bm25
+sentence-transformers
+torch
+PyPDF2
+nltk
+rouge-score
+bert-score
+tqdm

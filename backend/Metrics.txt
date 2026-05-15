@@ -1,0 +1,83 @@
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+LAQA + MRL + Agentic RAG
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.7415
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5       : 0.4600
+Recall@5          : 0.6667
+MRR               : 0.5494
+NDCG@5            : 0.9504
+Hit-Rate@5        : 0.6667
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.0938
+BLEU-2             : 0.0578
+BLEU-4             : 0.0250
+ROUGE-1            : 0.1977
+ROUGE-2            : 0.1014
+ROUGE-L            : 0.1669
+ROUGE-Lsum         : 0.1843
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.8600
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.7070
+Context Relevancy  : 0.6837
+Answer relevancy   : 0.4898
+Grounding Score    : 0.5840
+Retrieval Score    : 0.8905
+Hallucination Safe : 1.0000
+Grounded Answers   : 1.0000
+Safe Refusal Rate  : 0.0000
+Answer Quality     : 0.8000
+
+-----------------------------------------------------------------------
+
+without LAQA
+
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+MRL + Agentic RAG
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.7933
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.4310
+Recall@5           : 0.6011
+MRR                : 0.5328
+NDCG@5             : 0.9354
+Hit-Rate@5         : 0.6145
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.1437
+BLEU-2             : 0.0980
+BLEU-4             : 0.0594
+ROUGE-1            : 0.2949
+ROUGE-2            : 0.1560
+ROUGE-L            : 0.2622
+ROUGE-Lsum         : 0.2717
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.8498
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.8025
+Context Relevancy  : 0.7556
+Answer relevancy   : 0.5197
+Grounding Score    : 0.7593
+Retrieval Score    : 0.7404
+Hallucination Safe : 1.0000
+Grounded Answers   : 1.0000
+Safe Refusal Rate  : 0.0000
+Answer Quality     : 0.9333
+================================================================================
+
+
+llama 3.1 4b / 8b-> scope  
