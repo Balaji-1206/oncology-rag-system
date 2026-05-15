@@ -1,5 +1,4 @@
 import json
-import settings
 
 from profile_pipeline import (
     PipelineProfiler,
@@ -46,7 +45,11 @@ from metrics import (
 
 questions = [
 
-    "What are the common side effects of chemotherapy?"
+    "What are the common side effects of chemotherapy?",
+    "How does immunotherapy work in cancer treatment?",
+    "What are the latest advancements in targeted therapy for lung cancer?",
+    "How can I manage fatigue during cancer treatment?",
+    "What are the dietary recommendations for cancer patients?"
 ]
 
 # =========================================================
@@ -64,17 +67,9 @@ def question_runner(
     # -----------------------------------------------------
     with profiler.profile_stage("LAQA"):
 
-        if settings.is_laqa_enabled():
-
-            laqa_result = process_query(
-                question
-            )
-
-        else:
-
-            laqa_result = settings.build_raw_query_payload(
-                question
-            )
+        laqa_result = process_query(
+            question
+        )
 
         expanded_query = laqa_result.get(
             "expanded_query",

@@ -1,0 +1,9 @@
+{
+  "chunks_count": 24106,
+  "created_at": "2026-05-15T11:44:41.086659Z",
+  "documents_count": 24106,
+  "embedding_dimension": 256,
+  "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
+  "mrl_enabled": false,
+  "version": 2
+}

@@ -138,28 +138,14 @@ def get_mrl_embedding(
             normalize_embeddings=True
         )
 
-        if settings.is_mrl_enabled():
+        if encoded.shape[1] < requested_dim:
 
-            if encoded.shape[1] < requested_dim:
+            raise ValueError(
+                f"Requested dimension {requested_dim}, "
+                f"but model returned {encoded.shape[1]} dimensions"
+            )
 
-                raise ValueError(
-                    f"Requested MRL dimension {requested_dim}, "
-                    f"but model returned {encoded.shape[1]} dimensions"
-                )
-
-            encoded = encoded[:, :requested_dim]
-
-        else:
-
-            requested_dim = encoded.shape[1]
-
-            if requested_dim != settings.FULL_EMBEDDING_DIMENSION:
-
-                print(
-                    "WARNING: Full embedding dimension from model "
-                    f"is {requested_dim}; configured fallback is "
-                    f"{settings.FULL_EMBEDDING_DIMENSION}."
-                )
+        encoded = encoded[:, :requested_dim]
 
         encoded = np.array(
             encoded,

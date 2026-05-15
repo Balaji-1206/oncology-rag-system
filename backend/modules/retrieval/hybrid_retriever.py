@@ -181,20 +181,92 @@ except (FileNotFoundError, ValueError) as e:
     print(f"❌ Database validation failed: {e}")
     raise
 
-# Load indexes from dynamic path
-index = faiss.read_index(f"{db_path}/faiss.index")
+# =========================================================
+# 🔹 GLOBAL RUNTIME CACHING
+# =========================================================
+# Cache state: track current database path and loaded objects
+_CACHE = {
+    "current_db_path": None,
+    "faiss_index": None,
+    "bm25": None,
+    "ids": None,
+    "id_to_text": None,
+    "chunk_metadata": None
+}
 
-with open(f"{db_path}/bm25.pkl", "rb") as f:
-    bm25 = pickle.load(f)
+def _reload_all_indexes(verbose=False):
+    """Internal: reload all indexes from disk. Called only when db path changes."""
+    db_path = settings.get_database_path()
 
-with open(f"{db_path}/ids.pkl", "rb") as f:
-    ids = pickle.load(f)
+    if verbose:
+        print(f"🔄 Reloading indexes from {db_path}...")
 
-with open(f"{db_path}/id_to_text.pkl", "rb") as f:
-    id_to_text = pickle.load(f)
+    _CACHE["faiss_index"] = faiss.read_index(f"{db_path}/faiss.index")
 
-with open(f"{db_path}/chunks.pkl", "rb") as f:
-    chunk_metadata = pickle.load(f)
+    with open(f"{db_path}/bm25.pkl", "rb") as f:
+        _CACHE["bm25"] = pickle.load(f)
+
+    with open(f"{db_path}/ids.pkl", "rb") as f:
+        _CACHE["ids"] = pickle.load(f)
+
+    with open(f"{db_path}/id_to_text.pkl", "rb") as f:
+        _CACHE["id_to_text"] = pickle.load(f)
+
+    with open(f"{db_path}/chunks.pkl", "rb") as f:
+        _CACHE["chunk_metadata"] = pickle.load(f)
+
+    _CACHE["current_db_path"] = db_path
+
+    if verbose:
+        print(f"✅ Indexes reloaded successfully")
+
+def get_index():
+    """Get FAISS index, reloading only if database path changed."""
+    db_path = settings.get_database_path()
+
+    if _CACHE["current_db_path"] != db_path:
+        _reload_all_indexes(verbose=True)
+
+    return _CACHE["faiss_index"]
+
+def get_bm25():
+    """Get BM25 index, reloading only if database path changed."""
+    db_path = settings.get_database_path()
+
+    if _CACHE["current_db_path"] != db_path:
+        _reload_all_indexes(verbose=True)
+
+    return _CACHE["bm25"]
+
+def get_ids():
+    """Get document IDs, reloading only if database path changed."""
+    db_path = settings.get_database_path()
+
+    if _CACHE["current_db_path"] != db_path:
+        _reload_all_indexes(verbose=True)
+
+    return _CACHE["ids"]
+
+def get_id_to_text():
+    """Get document text map, reloading only if database path changed."""
+    db_path = settings.get_database_path()
+
+    if _CACHE["current_db_path"] != db_path:
+        _reload_all_indexes(verbose=True)
+
+    return _CACHE["id_to_text"]
+
+def get_chunk_metadata():
+    """Get chunk metadata, reloading only if database path changed."""
+    db_path = settings.get_database_path()
+
+    if _CACHE["current_db_path"] != db_path:
+        _reload_all_indexes(verbose=True)
+
+    return _CACHE["chunk_metadata"]
+
+# Load once at module import
+_reload_all_indexes()
 
 
 # =========================================================
@@ -453,7 +525,7 @@ def section_boost(
     if query_section is None:
         return 0
 
-    meta = chunk_metadata.get(
+    meta = get_chunk_metadata().get(
         doc_id,
         {}
     )
@@ -554,7 +626,7 @@ def metadata_alignment_boost(
     doc_id
 ):
 
-    meta = chunk_metadata.get(
+    meta = get_chunk_metadata().get(
         doc_id,
         {}
     )
@@ -683,13 +755,14 @@ def hybrid_search(
     _
 ):
 
+    current_index = get_index()
     expected_dim = settings.effective_embedding_dimension()
 
-    if index.d != expected_dim:
+    if current_index.d != expected_dim:
 
         raise ValueError(
             "WARNING: FAISS index dimension mismatch. "
-            f"Index dimension is {index.d}, but active embedding "
+            f"Index dimension is {current_index.d}, but active embedding "
             f"dimension is {expected_dim}. Reindex with "
             "backend/index_data.py after changing MRL mode."
         )
@@ -753,7 +826,11 @@ def hybrid_search(
         intent=intent
     )
 
-    D, I = index.search(
+    current_bm25 = get_bm25()
+    current_ids = get_ids()
+    current_id_to_text = get_id_to_text()
+
+    D, I = current_index.search(
         query_vec,
         candidate_k
     )
@@ -764,10 +841,10 @@ def hybrid_search(
 
     for idx, dist in zip(I[0], D[0]):
 
-        if idx < 0 or idx >= len(ids):
+        if idx < 0 or idx >= len(current_ids):
             continue
 
-        dense_ids.append(ids[idx])
+        dense_ids.append(current_ids[idx])
 
         dense_scores.append(float(dist))
 
@@ -778,7 +855,7 @@ def hybrid_search(
     # =====================================================
     # 🔹 SPARSE SEARCH
     # =====================================================
-    bm25_scores = bm25.get_scores(
+    bm25_scores = current_bm25.get_scores(
         query_tokens
     )
 
@@ -787,7 +864,7 @@ def hybrid_search(
     )[-candidate_k:]
 
     sparse_ids = [
-        ids[i]
+        current_ids[i]
         for i in top_idx
     ]
 
@@ -829,7 +906,7 @@ def hybrid_search(
     # =====================================================
     for doc_id in list(doc_score_map.keys()):
 
-        text = id_to_text[doc_id]
+        text = current_id_to_text[doc_id]
 
         overlap_score = keyword_overlap_score(
             query_tokens,
@@ -876,7 +953,7 @@ def hybrid_search(
 
     for doc_id, score in doc_score_map.items():
 
-        text = id_to_text[doc_id]
+        text = current_id_to_text[doc_id]
 
         # Remove weak overlap docs
         overlap = keyword_overlap_score(
@@ -909,7 +986,7 @@ def hybrid_search(
     ]
 
     candidate_texts = [
-        id_to_text[doc_id]
+        current_id_to_text[doc_id]
         for doc_id in candidate_ids
     ]
 
@@ -932,7 +1009,7 @@ def hybrid_search(
 
         for doc_id in candidate_ids:
 
-            if id_to_text[doc_id] == text:
+            if current_id_to_text[doc_id] == text:
 
                 reranked_ids.append(doc_id)
                 break

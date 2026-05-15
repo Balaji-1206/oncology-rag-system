@@ -4,13 +4,17 @@ from threading import Lock
 
 
 # =========================================================
-# GLOBAL FEATURE FLAGS
+# GLOBAL FEATURE FLAGS - DO NOT EDIT
+# =========================================================
+# These are defaults only. To change settings, edit:
+# -> runtime_settings.json (actual config file)
+# Or use: settings.update_settings({'enable_mrl': False})
 # =========================================================
 ENABLE_LAQA = True
-ENABLE_MRL = True
+ENABLE_MRL = False
 
 MRL_DIMENSION = 512
-FULL_EMBEDDING_DIMENSION = 768
+FULL_EMBEDDING_DIMENSION = 256
 
 _SETTINGS_PATH = os.path.join(
     os.path.dirname(__file__),
