@@ -138,7 +138,6 @@ def sentence_relevance(
         1
     )
 
-    # Prefer concise evidence
     length = len(sentence.split())
 
     if length > 45:
@@ -188,7 +187,6 @@ def extract_supporting_sentences(
             if len(sent) < 40:
                 continue
 
-            # Ignore noisy academic text
             banned = [
 
                 "et al",
@@ -240,15 +238,14 @@ def extract_supporting_sentences(
 
         seen.add(short)
 
-        if len(sent) > 180:
-            sent = sent[:180] + "..."
+        if len(sent) > 220:
+            sent = sent[:220] + "..."
 
         final.append(sent)
 
-        if len(final) >= 3:
+        if len(final) >= 4:
             break
 
-    # Fallback
     if not final:
 
         for doc in docs[:1]:
@@ -264,7 +261,7 @@ def extract_supporting_sentences(
 
                 if len(sent) > 50:
 
-                    final.append(sent[:180])
+                    final.append(sent[:220])
 
                     break
 
@@ -311,12 +308,10 @@ def calibrate_confidence(
         0.15 * answer_relevance
     )
 
-    # Penalize contradictions
     confidence -= (
         contradiction_score * 0.30
     )
 
-    # Penalize hallucination
     if hallucination == "high":
         confidence *= 0.50
 
@@ -325,7 +320,7 @@ def calibrate_confidence(
 
     confidence = max(
         0.05,
-        min(confidence, 0.88)
+        min(confidence, 0.95)
     )
 
     return round(confidence, 2)
@@ -346,40 +341,249 @@ def quality_label(score):
 
 
 # =========================================================
-# 🔹 FAST REASONING
+# REASONING OUTPUT CLEANING
 # =========================================================
-def fast_reasoning(
-    confidence,
-    grounding,
-    contradiction
+REASONING_MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q5_K_M"
+
+LEAK_PATTERNS = [
+    r"\bthought\b",
+    r"\banalysis\b",
+    r"\bchain[-\s]*of[-\s]*thought\b",
+    r"\bthe user wants\b",
+    r"\bi need to\b",
+    r"\bi should\b",
+    r"\bi will\b",
+    r"\blet me\b",
+    r"\bfollow the instructions\b",
+    r"\bstrict output rules\b",
+    r"\bsystem prompt\b",
+    r"\bdeveloper message\b",
+    r"\bprompt instructions\b",
+    r"\breasoning process\b",
+    r"\bstep by step\b",
+    r"\bstep-by-step\b",
+]
+
+CONVERSATION_PATTERNS = [
+    r"\bplease provide\b",
+    r"\bcan you provide\b",
+    r"\bi can help\b",
+    r"\bas an ai\b",
+    r"\bi am unable\b",
+    r"\bmore context\b",
+    r"\bif you\b",
+]
+
+PROMPT_ECHO_PATTERNS = [
+    r"(?is)question\s*:.*?(?=\n-|\Z)",
+    r"(?is)context\s*:.*?(?=\n-|\Z)",
+    r"(?is)answer\s*:.*?(?=\n-|\Z)",
+    r"(?is)output contract\s*:.*?(?=\n-|\Z)",
+    r"(?is)source material\s*:.*?(?=\n-|\Z)",
+    r"(?is)clinical reasoning bullets\s*:?",
+    r"(?is)oncology_clinical_reasoning_completion",
+]
+
+
+def compact_text(text, limit):
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        str(text or "")
+    ).strip()
+
+    return text[:limit]
+
+
+def has_prompt_leak(text):
+
+    lowered = str(text or "").lower()
+
+    return any(
+        re.search(pattern, lowered, re.IGNORECASE)
+        for pattern in LEAK_PATTERNS + CONVERSATION_PATTERNS
+    )
+
+
+def normalize_reasoning_bullets(text):
+
+    cleaned = str(text or "")
+
+    cleaned = re.sub(
+        r"```(?:\w+)?",
+        "",
+        cleaned
+    )
+
+    cleaned = re.sub(
+        r"<[^>]*>",
+        "",
+        cleaned
+    )
+
+    cleaned = cleaned.replace(
+        "\r",
+        "\n"
+    )
+
+    for pattern in PROMPT_ECHO_PATTERNS:
+
+        cleaned = re.sub(
+            pattern,
+            "",
+            cleaned
+        )
+
+    cleaned = re.sub(
+        r"(?im)^\s*(assistant|system|user|model|reasoning|analysis|thought)\s*:\s*",
+        "",
+        cleaned
+    )
+
+    cleaned = re.sub(
+        r"(?im)^\s*(?:[-*]|\d+[.)])\s*",
+        "- ",
+        cleaned
+    )
+
+    candidates = []
+
+    for line in cleaned.split("\n"):
+
+        line = re.sub(
+            r"\s+",
+            " ",
+            line
+        ).strip()
+
+        if not line:
+            continue
+
+        if line.startswith("- "):
+            line = line[2:].strip()
+
+        if has_prompt_leak(line):
+            continue
+
+        if re.search(
+            r"(?i)\b(requirements|instructions|do not|only use|return only)\b",
+            line
+        ):
+            continue
+
+        line = re.sub(
+            r"(?i)\b(based on|according to)\s+(the\s+)?(provided\s+)?context[:,]?\s*",
+            "",
+            line
+        ).strip()
+
+        line = re.sub(
+            r"(?i)\bclinical reasoning\b[:,]?\s*",
+            "",
+            line
+        ).strip()
+
+        line = line.strip(" -;:")
+
+        if len(line) < 18:
+            continue
+
+        if len(line.split()) > 28:
+
+            line = " ".join(
+                line.split()[:28]
+            ).rstrip(" ,;:")
+
+        if line and line[-1] not in ".!?":
+            line += "."
+
+        candidates.append(line)
+
+    final = []
+    seen = set()
+
+    for line in candidates:
+
+        key = re.sub(
+            r"\W+",
+            " ",
+            line.lower()
+        )[:90]
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        final.append(line)
+
+        if len(final) >= 4:
+            break
+
+    if len(final) < 2:
+        return ""
+
+    return "\n".join(
+        f"- {line}"
+        for line in final[:4]
+    )
+
+
+def fallback_reasoning(
+    query,
+    answer,
+    docs
 ):
 
-    if confidence >= 0.82:
+    supporting = extract_supporting_sentences(
+        query,
+        answer,
+        docs or []
+    )
 
-        return (
-            "- The answer is strongly supported by retrieved oncology evidence.\n"
-            "- Retrieved medical context aligns closely with the generated response."
+    bullets = []
+
+    answer_summary = compact_text(
+        answer,
+        180
+    )
+
+    if answer_summary:
+
+        bullets.append(
+            "The answer remains tied to retrieved oncology evidence: "
+            + answer_summary
         )
 
-    if grounding >= 0.6:
+    for sent in supporting[:2]:
 
-        return (
-            "- The answer is partially grounded in retrieved medical context.\n"
-            "- Relevant oncology evidence was identified."
+        sent = compact_text(
+            sent,
+            190
         )
 
-    if contradiction > 0.4:
+        if sent:
 
-        return (
-            "- Retrieved evidence contains uncertainty or limited support.\n"
-            "- The generated answer may not be fully supported by the context."
-        )
+            bullets.append(
+                "A retrieved evidence point supporting the answer is: "
+                + sent
+            )
 
-    return None
+    if not bullets:
+
+        bullets = [
+            "Retrieved oncology evidence was limited, so the explanation should be interpreted cautiously.",
+            "The answer should remain tied to documented findings and avoid unsupported clinical conclusions."
+        ]
+
+    return "\n".join(
+        f"- {bullet.rstrip('.')}."
+        for bullet in bullets[:4]
+    )
 
 
 # =========================================================
-# 🔹 LLM REASONING
+# 🔹 MEDICAL REASONING GENERATION
 # =========================================================
 def generate_reasoning(
     query,
@@ -387,35 +591,49 @@ def generate_reasoning(
     docs
 ):
 
-    context = "\n".join(
-        docs[:2]
-    )[:1200]
+    safe_docs = [
+        compact_text(doc, 850)
+        for doc in (docs or [])[:3]
+        if str(doc or "").strip()
+    ]
 
-    prompt = f"""
-You are validating a medical oncology RAG response.
+    if not safe_docs:
 
-STRICT RULES:
-- ONLY use provided context
-- NEVER hallucinate
-- Output EXACTLY 2 concise bullet points
-- Mention whether evidence supports the answer
-- Mention if evidence is incomplete
-- No markdown headers
-- No XML tags
-- No chain-of-thought
-- No reasoning traces
+        return fallback_reasoning(
+            query,
+            answer,
+            docs
+        )
 
-QUESTION:
-{query}
+    context = "\n\n".join(
+        safe_docs
+    )[:2400]
 
-CONTEXT:
-{context}
+    prompt = f"""ONCOLOGY_CLINICAL_REASONING_COMPLETION
 
-ANSWER:
-{answer}
+Source material:
+Question: {compact_text(query, 320)}
+Retrieved evidence: {context}
+Answer to explain: {compact_text(answer, 900)}
 
-VERIFICATION:
-"""
+Output contract:
+- Produce final clinical reasoning only.
+- Write 2 to 4 bullets.
+- Start every bullet with "- ".
+- Each bullet must be one concise oncology sentence.
+- Use only the retrieved evidence and answer.
+- Do not mention prompts, instructions, context, users, or internal thinking.
+- Do not ask questions.
+- Do not add a diagnosis, treatment, or fact that is not supported above.
+
+Clinical reasoning bullets:
+- """
+
+    fallback = fallback_reasoning(
+        query,
+        answer,
+        docs
+    )
 
     try:
 
@@ -423,7 +641,7 @@ VERIFICATION:
             "http://localhost:11434/api/generate",
             json={
 
-                "model": "phi3:mini",
+                "model": REASONING_MODEL,
 
                 "prompt": prompt,
 
@@ -431,16 +649,32 @@ VERIFICATION:
 
                 "options": {
 
-                    "temperature": 0,
+                    "temperature": 0.05,
 
-                    "top_p": 0.1,
+                    "top_p": 0.70,
 
-                    "num_predict": 80,
+                    "top_k": 20,
 
-                    "keep_alive": "10m"
+                    "repeat_penalty": 1.20,
+
+                    "num_predict": 140,
+
+                    "num_ctx": 3072,
+
+                    "keep_alive": "10m",
+
+                    "stop": [
+                        "\nQuestion:",
+                        "\nContext:",
+                        "\nAnswer:",
+                        "\nOutput contract:",
+                        "\nSource material:",
+                        "USER:",
+                        "ASSISTANT:"
+                    ]
                 }
             },
-            timeout=40
+            timeout=60
         )
 
         raw = response.json().get(
@@ -448,13 +682,79 @@ VERIFICATION:
             ""
         ).strip()
 
-        cleaned = re.sub(
-            r"<.*?>",
-            "",
+        if raw and not raw.startswith("-"):
+            raw = "- " + raw
+
+        cleaned = normalize_reasoning_bullets(
             raw
         )
 
-        cleaned = cleaned.strip()
+        # =====================================================
+        # 🔹 REMOVE THOUGHT LEAKS
+        # =====================================================
+
+        cleaned = re.sub(
+            r"(?i)^thought\s*",
+            "",
+            cleaned
+        )
+
+        cleaned = re.sub(
+            r"(?i)^reasoning\s*",
+            "",
+            cleaned
+        )
+
+        cleaned = re.sub(
+            r"(?i)^analysis\s*",
+            "",
+            cleaned
+        )
+
+        cleaned = re.sub(
+            r"<.*?>",
+            "",
+            cleaned
+        )
+
+        # =====================================================
+        # 🔹 REMOVE PROMPT ECHOING
+        # =====================================================
+
+        bad_patterns = [
+
+            "the user wants me",
+
+            "i need to follow",
+
+            "strict output rules",
+
+            "reasoning process",
+
+            "step-by-step",
+
+            "clinical reasoning:"
+        ]
+
+        for p in bad_patterns:
+
+            cleaned = re.sub(
+                p + r".*",
+                "",
+                cleaned,
+                flags=re.IGNORECASE | re.DOTALL
+            )
+
+        # =====================================================
+        # 🔹 REMOVE NUMBERED CHAIN OF THOUGHT
+        # =====================================================
+
+        cleaned = re.sub(
+            r"^\s*\d+\.\s*",
+            "- ",
+            cleaned,
+            flags=re.MULTILINE
+        )
 
         cleaned = re.sub(
             r"\n{3,}",
@@ -462,12 +762,17 @@ VERIFICATION:
             cleaned
         )
 
-        if len(cleaned) < 15:
+        cleaned = cleaned.strip()
 
-            return (
-                "- Retrieved evidence partially supports the answer.\n"
-                "- Some medical details may be incomplete."
-            )
+        # =====================================================
+        # 🔹 FALLBACK
+        # =====================================================
+
+        if (
+            len(cleaned) < 40
+            or has_prompt_leak(cleaned)
+        ):
+            return fallback
 
         return cleaned
 
@@ -475,12 +780,7 @@ VERIFICATION:
 
         print("⚠️ Reasoning failed:", e)
 
-        return (
-            "- Retrieved evidence could not be fully verified.\n"
-            "- Supporting oncology context may be incomplete."
-        )
-
-
+        return fallback
 # =========================================================
 # 🔹 MAIN EXPLAINER
 # =========================================================
@@ -552,24 +852,7 @@ def generate_explanation(
     )
 
     # =====================================================
-    # 🔹 FAST REASONING
-    # =====================================================
-    quick_reasoning = fast_reasoning(
-        confidence,
-        grounding_score,
-        contradiction_score
-    )
-
-    if quick_reasoning is not None:
-
-        explanation[
-            "reasoning"
-        ] = quick_reasoning
-
-        return explanation
-
-    # =====================================================
-    # 🔹 LLM REASONING
+    # 🔹 FULL MEDICAL REASONING
     # =====================================================
     explanation["reasoning"] = generate_reasoning(
         query,

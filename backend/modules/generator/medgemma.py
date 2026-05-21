@@ -583,13 +583,6 @@ def build_grounding_rules(query_type):
 - If the retrieved evidence does not contain the answer, say "I don't have enough information to answer that."
 """
 
-    return """
-- Use retrieved evidence as the primary source
-- Avoid unsupported medical claims
-- If evidence is weak, clearly mention uncertainty
-- Do not invent entities, rankings, statistics, or recommendations absent from evidence
-"""
-
 
 # =========================================================
 # 🔹 DIRECTNESS RULES

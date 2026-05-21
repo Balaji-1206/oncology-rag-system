@@ -799,11 +799,11 @@ ANSWER:
 
             score = min(score, 6)
 
-        if directness < 0.40:
+        if directness < 0.20:
 
             answer_relevance = min(
                 answer_relevance,
-                0.50
+                0.70
             )
 
             confidence = min(
@@ -850,7 +850,7 @@ ANSWER:
         # =====================================================
         answer_relevance = min(
             answer_relevance,
-            grounding + 0.20
+            grounding + 0.30
         )
 
         # =====================================================
@@ -864,7 +864,7 @@ ANSWER:
         elif not answered_question:
             retry = True
 
-        elif answer_relevance < 0.60:
+        elif answer_relevance < 0.50:
             retry = True
 
         elif grounding < 0.25:

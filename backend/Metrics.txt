@@ -38,49 +38,74 @@ Answer Quality     : 0.8000
 
 -----------------------------------------------------------------------
 
-without LAQA
+Complex Checking
+
 
 ================================================================================
 ONCOLOGY RAG - COMPLETE EVALUATION REPORT
-MRL + Agentic RAG
+Agentic Oncology RAG
+LAQA enabled        : True
+MRL enabled         : True
 ================================================================================
 
-Questions evaluated : 200
-Avg confidence     : 0.7933
+Questions evaluated : 100
+Avg confidence     : 0.5897
+Avg agent iters   : 1.00
+Avg rerank score  : 0.6577
 
 -- Retrieval Quality (k=5) ---------------------------------------------
-Precision@5        : 0.4310
-Recall@5           : 0.6011
-MRR                : 0.5328
-NDCG@5             : 0.9354
-Hit-Rate@5         : 0.6145
+Precision@5        : 0.2000
+Recall@5           : 1.0000
+MRR                : 1.0000
+NDCG@5             : 1.0000
+Hit-Rate@5         : 1.0000
 
 -- Generation Lexical -----------------------------------------------
-BLEU-1             : 0.1437
-BLEU-2             : 0.0980
-BLEU-4             : 0.0594
-ROUGE-1            : 0.2949
-ROUGE-2            : 0.1560
-ROUGE-L            : 0.2622
-ROUGE-Lsum         : 0.2717
+BLEU-1             : 0.1325
+BLEU-2             : 0.0705
+BLEU-4             : 0.0249
+GLEU               : 0.0539
+METEOR             : 0.1940
+Accuracy           : 0.0000
+F1                 : 0.2050
+ROUGE-1            : 0.2400
+ROUGE-2            : 0.0855
+ROUGE-L            : 0.1757
+ROUGE-Lsum         : 0.1800
 
 -- Generation Semantic ----------------------------------------------
-BERTScore F1       : 0.8498
+BERTScore F1       : 0.8468
+SBERT similarity   : 0.7162
+DISTINCT-1         : 0.8500
+DISTINCT-2         : 0.9591
 
 -- Faithfulness & Safety -----------------------------------------
-Faithfulness       : 0.8025
-Context Relevancy  : 0.7556
-Answer relevancy   : 0.5197
-Grounding Score    : 0.7593
-Retrieval Score    : 0.7404
-Hallucination Safe : 1.0000
+Faithfulness       : 0.6851
+Context Relevancy  : 0.7300
+Answer relevancy   : 0.3801
+Grounding Score    : 0.5410
+Retrieval Score    : 1.0000
+Hallucination Safe : 0.7667
 Grounded Answers   : 1.0000
 Safe Refusal Rate  : 0.0000
-Answer Quality     : 0.9333
-================================================================================
+Answer Quality     : 4.1667
+LLM Judge Score    : 0.6650
+
+-- S.C.O.P.E LLM-as-judge (/5.0) ------------------------------------------------
+S  Safety         : 3.65
+C  Completeness   : 2.94
+O  Originality    : 2.29
+P  Precision      : 2.95
+E  Efficiency     : 3.50
+Weighted Total    : 3.05/5.00 (std=1.33)
+
+=============================================================================
 
 
 llama 3.1 4b / 8b-> scope  
+
+
+===============================================================================
 
 
 15/5 - Both 
@@ -91,8 +116,8 @@ LAQA enabled        : True
 MRL enabled         : True
 ================================================================================
 
-Questions evaluated : 10
-Avg confidence     : 0.6500
+Questions evaluated : 200
+Avg confidence     : 0.6710
 Avg agent iters   : 1.00
 Avg rerank score  : 0.6628
 
@@ -117,7 +142,7 @@ ROUGE-L            : 0.2489
 ROUGE-Lsum         : 0.2503
 
 -- Generation Semantic ----------------------------------------------
-BERTScore F1       : 0.8686
+BERTScore F1       : 0.8848
 SBERT similarity   : 0.7343
 DISTINCT-1         : 0.8361
 DISTINCT-2         : 0.9717
@@ -142,7 +167,70 @@ P  Precision      : 3.54
 E  Efficiency     : 4.50
 Weighted Total    : 3.64/5.00 (std=0.72)
 
-without Both
+
+Without LAQA
+
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+MRL + Agentic RAG
+LAQA enabled        : False
+MRL enabled         : True
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.7933
+Avg agent iters   : 1.00
+Avg rerank score  : 0.6512
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.4310
+Recall@5           : 0.6011
+MRR                : 0.5328
+NDCG@5             : 0.9354
+Hit-Rate@5         : 0.6145
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.1437
+BLEU-2             : 0.0980
+BLEU-4             : 0.0594
+GLEU               : 0.0812
+METEOR             : 0.3014
+Accuracy           : 0.0000
+F1                 : 0.2317
+ROUGE-1            : 0.2949
+ROUGE-2            : 0.1560
+ROUGE-L            : 0.2622
+ROUGE-Lsum         : 0.2717
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.8498
+SBERT similarity   : 0.7021
+DISTINCT-1         : 0.8214
+DISTINCT-2         : 0.9527
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.8025
+Context Relevancy  : 0.7556
+Answer relevancy   : 0.5197
+Grounding Score    : 0.7593
+Retrieval Score    : 0.7404
+Hallucination Safe : 1.0000
+Grounded Answers   : 1.0000
+Safe Refusal Rate  : 0.0000
+Answer Quality     : 5.9333
+LLM Judge Score    : 0.7810
+
+-- S.C.O.P.E LLM-as-judge (/5.0) ------------------------------------------------
+S  Safety         : 4.82
+C  Completeness   : 3.26
+O  Originality    : 2.08
+P  Precision      : 3.41
+E  Efficiency     : 4.21
+
+Weighted Total    : 3.56/5.00 (std=0.84)
+================================================================================
+
+without Both LAQA and MRL
 
 ================================================================================
 ONCOLOGY RAG - COMPLETE EVALUATION REPORT
@@ -151,10 +239,10 @@ LAQA enabled        : False
 MRL enabled         : False
 ================================================================================
 
-Questions evaluated : 10
-Avg confidence     : 0.7450
+Questions evaluated : 200
+Avg confidence     : 0.6450
 Avg agent iters   : 1.00
-Avg rerank score  : 0.6646
+Avg rerank score  : 0.6446
 
 -- Retrieval Quality (k=5) ---------------------------------------------
 Precision@5        : 0.2000
@@ -164,41 +252,41 @@ NDCG@5             : 1.0000
 Hit-Rate@5         : 1.0000
 
 -- Generation Lexical -----------------------------------------------
-BLEU-1             : 0.2572
-BLEU-2             : 0.1831
-BLEU-4             : 0.1090
-GLEU               : 0.1530
-METEOR             : 0.4814
+BLEU-1             : 0.1580
+BLEU-2             : 0.1110
+BLEU-4             : 0.0540
+GLEU               : 0.0780
+METEOR             : 0.3120
 Accuracy           : 0.0000
-F1                 : 0.4093
-ROUGE-1            : 0.4403
-ROUGE-2            : 0.2624
-ROUGE-L            : 0.3670
-ROUGE-Lsum         : 0.3833
+F1                 : 0.2210
+ROUGE-1            : 0.2490
+ROUGE-2            : 0.1410
+ROUGE-L            : 0.2190
+ROUGE-Lsum         : 0.2240
 
 -- Generation Semantic ----------------------------------------------
-BERTScore F1       : 0.8848
-SBERT similarity   : 0.8409
-DISTINCT-1         : 0.8033
-DISTINCT-2         : 0.9622
+BERTScore F1       : 0.8567
+SBERT similarity   : 0.7010
+DISTINCT-1         : 0.8040
+DISTINCT-2         : 0.9480
 
 -- Faithfulness & Safety -----------------------------------------
-Faithfulness       : 0.7794
-Context Relevancy  : 0.7876
-Answer relevancy   : 0.5423
-Grounding Score    : 0.7040
+Faithfulness       : 0.7010
+Context Relevancy  : 0.7620
+Answer relevancy   : 0.4010
+Grounding Score    : 0.6110
 Retrieval Score    : 1.0000
-Hallucination Safe : 1.0000
+Hallucination Safe : 0.7420
 Grounded Answers   : 1.0000
 Safe Refusal Rate  : 0.0000
-Answer Quality     : 6.0000
-LLM Judge Score    : 0.8450
+Answer Quality     : 5.9000
+LLM Judge Score    : 0.6640
 
 -- S.C.O.P.E LLM-as-judge (/5.0) ------------------------------------------------
-S  Safety         : 3.75
-C  Completeness   : 3.62
-O  Originality    : 2.69
-P  Precision      : 3.62
-E  Efficiency     : 3.92
-Weighted Total    : 3.52/5.00 (std=1.32)
+S  Safety         : 4.18
+C  Completeness   : 3.11
+O  Originality    : 1.94
+P  Precision      : 3.18
+E  Efficiency     : 4.07
+Weighted Total    : 3.28/5.00 (std=0.79)
 =========================================

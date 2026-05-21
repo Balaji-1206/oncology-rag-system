@@ -2,6 +2,7 @@ import numpy as np
 import requests
 import json
 import re
+import warnings
 from functools import lru_cache
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from nltk.translate.gleu_score import sentence_gleu
@@ -28,6 +29,37 @@ rouge = rouge_scorer.RougeScorer(
 _combined_llm_cache = {}
 
 
+def _normalize_context_docs(contexts):
+
+    if contexts is None:
+        return []
+
+    if isinstance(contexts, str):
+        contexts = [contexts]
+
+    normalized = []
+
+    for context in contexts:
+
+        if context is None:
+            continue
+
+        if isinstance(context, dict):
+            context = (
+                context.get("text")
+                or context.get("content")
+                or context.get("chunk")
+                or ""
+            )
+
+        context = str(context).strip()
+
+        if context:
+            normalized.append(context)
+
+    return normalized
+
+
 @lru_cache(maxsize=20000)
 def cached_lower(text):
 
@@ -48,6 +80,10 @@ def prepare_metric_embeddings(
     prediction,
     contexts
 ):
+
+    contexts = _normalize_context_docs(
+        contexts
+    )
 
     context_text = " ".join(
         contexts
@@ -246,7 +282,15 @@ PREDICTION:
         originality = float(parsed.get("scope_originality", 0))
         precision = float(parsed.get("scope_precision", 0))
         efficiency = float(parsed.get("scope_efficiency", 0))
-        weighted = np.mean([safety, completeness, originality, precision, efficiency])
+        # Properly weighted SCOPE calculation.
+        # Safety is most critical for medical QA.
+        weighted = (
+            0.35 * safety +
+            0.25 * completeness +
+            0.20 * precision +
+            0.10 * efficiency +
+            0.10 * originality
+        )
 
         result = {
             "llm_judge_score": max(0, min(judge_score, 1)),
@@ -265,23 +309,67 @@ PREDICTION:
 
     except Exception as e:
 
-        print("Combined LLM evaluation failed:", e)
+        print("❌ LLM evaluation failed:", e)
+        print("⚠️ Falling back to hybrid scoring...")
 
-        result = {
-            "llm_judge_score": 0.0,
-            "llm_judge_reason": "judge_failed",
-            "scope_safety": 0.0,
-            "scope_completeness": 0.0,
-            "scope_originality": 0.0,
-            "scope_precision": 0.0,
-            "scope_efficiency": 0.0,
-            "scope_weighted_total": 0.0
-        }
+        try:
+            bleu_score = compute_bleu_scores(
+                reference[:1200],
+                prediction[:1200]
+            ).get("bleu4", 0.0)
 
+            sbert_score = compute_sbert_similarity(
+                reference[:1200],
+                prediction[:1200]
+            )
 
-        _combined_llm_cache[cache_key] = result
+            faith_score = compute_faithfulness(
+                prediction[:1200],
+                [reference[:1200]]
+            )
 
-        return result
+            hybrid_score = (
+                0.4 * bleu_score +
+                0.4 * sbert_score +
+                0.2 * faith_score
+            )
+
+            scope_score = min(
+                1.0 + (hybrid_score * 4.0),
+                5.0
+            )
+
+            result = {
+                "llm_judge_score": hybrid_score,
+                "llm_judge_reason": "fallback_hybrid_score",
+                "scope_safety": round(scope_score, 2),
+                "scope_completeness": round(scope_score, 2),
+                "scope_originality": round(max(1.0, scope_score * 0.8), 2),
+                "scope_precision": round(scope_score, 2),
+                "scope_efficiency": round(max(1.0, scope_score * 0.9), 2),
+                "scope_weighted_total": round(scope_score, 2)
+            }
+
+            _combined_llm_cache[cache_key] = result
+            return result
+
+        except Exception as fallback_error:
+
+            print("⚠️ Fallback also failed:", fallback_error)
+
+            result = {
+                "llm_judge_score": 0.0,
+                "llm_judge_reason": "critical_failure_all_systems",
+                "scope_safety": 1.0,
+                "scope_completeness": 1.0,
+                "scope_originality": 1.0,
+                "scope_precision": 1.0,
+                "scope_efficiency": 1.0,
+                "scope_weighted_total": 1.0
+            }
+
+            _combined_llm_cache[cache_key] = result
+            return result
 
 
 def llm_as_judge_score(question, reference, prediction):
@@ -363,40 +451,142 @@ def ndcg(pred_ids, gt_ids, k=5):
 # 🔹 FAITHFULNESS & RELEVANCE
 # -------------------------------
 def compute_faithfulness(answer, contexts):
+    """
+    Compute semantic faithfulness: how well the answer is grounded in contexts.
+    Uses embedding similarity instead of word overlap.
+    Returns: 0.0 to 1.0
+    """
     try:
-        context_text = cached_lower(
-            " ".join(contexts)
+        context_docs = _normalize_context_docs(
+            contexts
         )
-        answer_words = set(
-            cached_split_tokens(answer)
+
+        if not answer.strip():
+            return 0.0
+
+        if not context_docs:
+            warnings.warn(
+                "Faithfulness skipped: empty context received.",
+                RuntimeWarning
+            )
+            print(
+                "Faithfulness skipped: empty context received."
+            )
+            return 0.0
+
+        answer_emb = get_mrl_embedding(
+            [answer],
+            log=False
+        )[0]
+
+        context_embs = get_mrl_embedding(
+            context_docs,
+            log=False
         )
-        if not answer_words: return 0.0
-        overlap = sum(1 for w in answer_words if w in context_text)
-        return overlap / len(answer_words)
-    except Exception: return 0.0
+
+        if len(context_embs) == 0:
+            warnings.warn(
+                "Faithfulness skipped: empty context embeddings.",
+                RuntimeWarning
+            )
+            print(
+                "Faithfulness skipped: empty context embeddings."
+            )
+            return 0.0
+
+        max_similarity = max(
+            float(util.cos_sim(answer_emb, ctx_emb).item())
+            for ctx_emb in context_embs
+        )
+
+        return max(0.0, min(max_similarity, 1.0))
+
+    except Exception:
+        return 0.0
 
 def answer_relevance(answer, question):
+    """
+    Compute how well the answer addresses the question.
+    Uses semantic similarity instead of word matching.
+    Returns: 0.0 to 1.0
+    """
     try:
-        q_words = set(
-            cached_split_tokens(question)
+        if not answer.strip() or not question.strip():
+            return 0.0
+
+        q_emb = get_mrl_embedding(
+            [question],
+            log=False
+        )[0]
+
+        a_emb = get_mrl_embedding(
+            [answer],
+            log=False
         )
-        a_words = set(
-            cached_split_tokens(answer)
+
+        similarity = float(
+            util.cos_sim(q_emb, a_emb).item()
         )
-        if not q_words: return 0.0
-        overlap = len(q_words & a_words)
-        return overlap / len(q_words)
-    except Exception: return 0.0
+
+        return max(0.0, min(similarity, 1.0))
+
+    except Exception:
+        return 0.0
 
 def context_relevance(contexts, question):
+    """
+    Compute how relevant the retrieved contexts are to the question.
+    Uses semantic similarity instead of word overlap.
+    Returns: 0.0 to 1.0
+    """
     try:
-        context_text = cached_lower(
-            " ".join(contexts)
+        context_docs = _normalize_context_docs(
+            contexts
         )
-        q_words = set(
-            cached_split_tokens(question)
+
+        if not question.strip():
+            return 0.0
+
+        if not context_docs:
+            warnings.warn(
+                "Context relevancy skipped: empty context received.",
+                RuntimeWarning
+            )
+            print(
+                "Context relevancy skipped: empty context received."
+            )
+            return 0.0
+
+        q_emb = get_mrl_embedding(
+            [question],
+            log=False
+        )[0]
+
+        context_embs = get_mrl_embedding(
+            context_docs,
+            log=False
         )
-        if not q_words: return 0.0
-        overlap = sum(1 for w in q_words if w in context_text)
-        return overlap / len(q_words)
-    except Exception: return 0.0
+
+        if len(context_embs) == 0:
+            warnings.warn(
+                "Context relevancy skipped: empty context embeddings.",
+                RuntimeWarning
+            )
+            print(
+                "Context relevancy skipped: empty context embeddings."
+            )
+            return 0.0
+
+        similarities = [
+            float(util.cos_sim(q_emb, ctx_emb).item())
+            for ctx_emb in context_embs
+        ]
+
+        avg_relevance = (
+            sum(similarities) / len(similarities)
+        ) if similarities else 0.0
+
+        return max(0.0, min(avg_relevance, 1.0))
+
+    except Exception:
+        return 0.0

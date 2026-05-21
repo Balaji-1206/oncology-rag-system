@@ -36,7 +36,10 @@ from metrics import (
     compute_rouge_scores,
     compute_meteor_score,
     compute_sbert_similarity,
-    compute_bertscore
+    compute_bertscore,
+    compute_faithfulness,
+    context_relevance,
+    answer_relevance
 )
 
 # =========================================================
@@ -195,6 +198,11 @@ def question_runner(
             answer
         )
 
+        print(
+            "EVALUATOR RECEIVED DOCS:",
+            len(reranked_docs)
+        )
+
         eval_result = evaluate_answer(
             question,
             context,
@@ -262,9 +270,14 @@ def question_runner(
     # -----------------------------------------------------
     with profiler.profile_stage("Faithfulness Metric"):
 
-        faithfulness = eval_result.get(
-            "lexical_grounding_score",
-            0
+        print(
+            "FAITHFULNESS DOC COUNT:",
+            len(reranked_docs)
+        )
+
+        faithfulness = compute_faithfulness(
+            answer,
+            reranked_docs
         )
 
     # -----------------------------------------------------
@@ -272,9 +285,19 @@ def question_runner(
     # -----------------------------------------------------
     with profiler.profile_stage("Relevance Metric"):
 
-        relevance = eval_result.get(
-            "answer_relevance",
-            0
+        print(
+            "CONTEXT RELEVANCY DOC COUNT:",
+            len(reranked_docs)
+        )
+
+        context_rel = context_relevance(
+            reranked_docs,
+            question
+        )
+
+        relevance = answer_relevance(
+            answer,
+            question
         )
 
     # -----------------------------------------------------

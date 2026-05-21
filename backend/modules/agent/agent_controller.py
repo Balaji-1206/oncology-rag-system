@@ -520,6 +520,8 @@ def agent_decision(query_input):
 
                 "docs": [],
 
+                "context_docs": [],
+
                 "doc_ids": [],
 
                 "eval": {
@@ -574,6 +576,11 @@ def agent_decision(query_input):
         # =====================================================
         # 🔹 EVALUATION
         # =====================================================
+        print(
+            "EVALUATOR RECEIVED DOCS:",
+            len(compressed_docs)
+        )
+
         eval_result = evaluate_answer(
             laqa_output["expanded_query"],
             context,
@@ -657,6 +664,8 @@ def agent_decision(query_input):
 
                 "docs": docs,
 
+                "context_docs": compressed_docs,
+
                 "doc_ids": doc_ids,
 
                 "eval": eval_result
@@ -710,6 +719,8 @@ def agent_decision(query_input):
         "answer": safe_fallback_answer(),
 
         "docs": [],
+
+        "context_docs": [],
 
         "doc_ids": [],
 

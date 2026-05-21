@@ -186,6 +186,11 @@ def handle_query(user_query: str):
             # 🔥 UI
             "source_texts": docs,
 
+            "context_docs": agent_result.get(
+                "context_docs",
+                docs
+            ),
+
             # 🔥 XAI
             "explanation": explanation,
 
@@ -238,6 +243,8 @@ def handle_query(user_query: str):
             "sources": [],
 
             "source_texts": [],
+
+            "context_docs": [],
 
             "explanation": {
 

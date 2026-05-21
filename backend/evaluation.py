@@ -177,6 +177,16 @@ def evaluate(dataset_path):
             []
         )
 
+        context_docs = result.get(
+            "context_docs",
+            []
+        ) or contexts
+
+        print(
+            "EVALUATOR RECEIVED DOCS:",
+            len(context_docs)
+        )
+
         confidence = result.get(
             "confidence",
             0.5
@@ -199,10 +209,20 @@ def evaluate(dataset_path):
             q,
             gt,
             pred,
-            contexts
+            context_docs
         )
 
         gt_ids = pred_ids[:1] if pred_ids else []
+
+        print(
+            "FAITHFULNESS DOC COUNT:",
+            len(context_docs)
+        )
+
+        print(
+            "CONTEXT RELEVANCY DOC COUNT:",
+            len(context_docs)
+        )
 
         with ThreadPoolExecutor(
             max_workers=8
@@ -261,12 +281,12 @@ def evaluate(dataset_path):
                 "faithfulness": executor.submit(
                     compute_faithfulness,
                     pred,
-                    contexts
+                    context_docs
                 ),
 
                 "context_rel": executor.submit(
                     context_relevance,
-                    contexts,
+                    context_docs,
                     q
                 ),
 
@@ -370,6 +390,7 @@ def evaluate(dataset_path):
             }
 
             faithfulness = futures["faithfulness"].result()
+
             context_rel = futures["context_rel"].result()
             answer_rel = futures["answer_rel"].result()
 
@@ -814,7 +835,7 @@ def print_report(results, bert):
 if __name__ == "__main__":
 
     dataset_path = (
-        "backend/cleaned_output.json"
+        "backend/complex50.json"
     )
 
     results, bert = evaluate(
