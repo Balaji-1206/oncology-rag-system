@@ -15,6 +15,7 @@ ENABLE_MRL = False
 
 MRL_DIMENSION = 512
 FULL_EMBEDDING_DIMENSION = 256
+RETRIEVAL_RELEVANCE_THRESHOLD = 0.65
 
 _SETTINGS_PATH = os.path.join(
     os.path.dirname(__file__),
@@ -30,7 +31,8 @@ def _defaults():
         "enable_laqa": ENABLE_LAQA,
         "enable_mrl": ENABLE_MRL,
         "mrl_dimension": MRL_DIMENSION,
-        "full_embedding_dimension": FULL_EMBEDDING_DIMENSION
+        "full_embedding_dimension": FULL_EMBEDDING_DIMENSION,
+        "retrieval_relevance_threshold": RETRIEVAL_RELEVANCE_THRESHOLD
     }
 
 
@@ -98,6 +100,13 @@ def load_settings():
         )
     )
 
+    data["retrieval_relevance_threshold"] = float(
+        data.get(
+            "retrieval_relevance_threshold",
+            RETRIEVAL_RELEVANCE_THRESHOLD
+        )
+    )
+
     return data
 
 
@@ -142,6 +151,15 @@ def update_settings(payload):
             current["enable_mrl"]
         )
 
+    if "retrieval_relevance_threshold" in payload:
+
+        current["retrieval_relevance_threshold"] = float(
+            payload.get(
+                "retrieval_relevance_threshold",
+                current["retrieval_relevance_threshold"]
+            )
+        )
+
     save_settings(current)
 
     return current
@@ -169,6 +187,13 @@ def effective_embedding_dimension():
         return int(data["mrl_dimension"])
 
     return int(data["full_embedding_dimension"])
+
+
+def retrieval_relevance_threshold():
+
+    return float(
+        load_settings()["retrieval_relevance_threshold"]
+    )
 
 
 def get_database_path():

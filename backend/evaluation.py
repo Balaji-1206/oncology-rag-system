@@ -111,12 +111,12 @@ def evaluate(dataset_path):
     print("\n🚀 Running Evaluation...\n")
 
     total_questions = min(
-        10,
+        200,
         len(data)
     )
 
     progress_bar = tqdm(
-        data[:10],
+        data[:200],
         desc="🧪 Evaluating",
         ncols=120
     )
@@ -167,11 +167,6 @@ def evaluate(dataset_path):
             ""
         )
 
-        pred_ids = result.get(
-            "sources",
-            []
-        )
-
         contexts = result.get(
             "source_texts",
             []
@@ -211,8 +206,6 @@ def evaluate(dataset_path):
             pred,
             context_docs
         )
-
-        gt_ids = pred_ids[:1] if pred_ids else []
 
         print(
             "FAITHFULNESS DOC COUNT:",
@@ -298,32 +291,34 @@ def evaluate(dataset_path):
 
                 "precision": executor.submit(
                     precision_at_k,
-                    pred_ids,
-                    gt_ids
+                    context_docs,
+                    q
                 ),
 
                 "recall": executor.submit(
                     recall_at_k,
-                    pred_ids,
-                    gt_ids
+                    context_docs,
+                    q,
+                    5,
+                    context_docs
                 ),
 
                 "mrr": executor.submit(
                     mrr,
-                    pred_ids,
-                    gt_ids
+                    context_docs,
+                    q
                 ),
 
                 "ndcg": executor.submit(
                     ndcg,
-                    pred_ids,
-                    gt_ids
+                    context_docs,
+                    q
                 ),
 
                 "hit_rate": executor.submit(
                     hit_rate,
-                    pred_ids,
-                    gt_ids
+                    context_docs,
+                    q
                 )
             }
 

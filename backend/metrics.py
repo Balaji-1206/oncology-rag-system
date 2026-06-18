@@ -12,13 +12,15 @@ from sentence_transformers import util
 from nltk.translate.meteor_score import meteor_score
 from nltk.tokenize import word_tokenize
 
+import settings
 from modules.embeddings.mrl_embeddings import (
     get_mrl_embedding,
     prime_mrl_embedding_cache
 )
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-EVAL_MODEL = "phi3:mini"
+EVAL_MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q4_K_M "
+#hf.co/QuantFactory/Llama3-Med42-8B-GGUF:Q4_K_M 
 
 smooth = SmoothingFunction().method1
 rouge = rouge_scorer.RougeScorer(
@@ -412,40 +414,204 @@ def scope_llm_judge(question, reference, prediction):
 # -------------------------------
 # 🔹 RETRIEVAL METRICS
 # -------------------------------
-def precision_at_k(pred_ids, gt_ids, k=5):
-    try:
-        if not pred_ids: return 0.0
-        return len(set(pred_ids[:k]) & set(gt_ids)) / k
-    except Exception: return 0.0
+def _retrieval_threshold(threshold=None):
 
-def recall_at_k(pred_ids, gt_ids, k=5):
-    try:
-        if not gt_ids: return 0.0
-        return len(set(pred_ids[:k]) & set(gt_ids)) / len(gt_ids)
-    except Exception: return 0.0
+    if threshold is not None:
+        return float(threshold)
 
-def mrr(pred_ids, gt_ids):
+    return settings.retrieval_relevance_threshold()
+
+
+def semantic_relevance_scores(query, chunks):
+    """
+    Return cosine_similarity(embedding(query), embedding(chunk)) per chunk.
+    Assumption: no human relevance labels exist, so semantic similarity is used
+    as a weak relevance signal. Limitation: similarity can over-credit passages
+    that are topically related but clinically incomplete or incorrect.
+    """
     try:
-        for i, pid in enumerate(pred_ids):
-            if pid in gt_ids:
-                return 1.0 / (i + 1)
+        docs = _normalize_context_docs(
+            chunks
+        )
+
+        if not query.strip() or not docs:
+            return []
+
+        embeddings = get_mrl_embedding(
+            [query] + docs,
+            log=False
+        )
+
+        q_emb = embeddings[0]
+        doc_embs = embeddings[1:]
+
+        return [
+            float(util.cos_sim(q_emb, doc_emb).item())
+            for doc_emb in doc_embs
+        ]
+
+    except Exception:
+        return []
+
+
+def semantic_relevance_labels(query, chunks, threshold=None):
+    """
+    relevant(chunk) = 1 when cosine_similarity(query, chunk) >= threshold,
+    else 0. This avoids fabricating labels from retrieved IDs.
+    """
+    cutoff = _retrieval_threshold(
+        threshold
+    )
+
+    return [
+        1 if score >= cutoff else 0
+        for score in semantic_relevance_scores(
+            query,
+            chunks
+        )
+    ]
+
+
+def precision_at_k(chunks, query, k=5, threshold=None):
+    """
+    Precision@K = (# relevant documents in top K) / K.
+    Uses semantic binary labels because this dataset has no judged relevant
+    documents.
+    """
+    try:
+        labels = semantic_relevance_labels(
+            query,
+            chunks,
+            threshold
+        )
+
+        if not labels:
+            return 0.0
+
+        return sum(labels[:k]) / k
+
+    except Exception:
         return 0.0
-    except Exception: return 0.0
 
-def hit_rate(pred_ids, gt_ids):
-    try:
-        return float(int(any(pid in gt_ids for pid in pred_ids)))
-    except Exception: return 0.0
 
-def ndcg(pred_ids, gt_ids, k=5):
+def recall_at_k(chunks, query, k=5, candidate_pool=None, threshold=None):
+    """
+    Recall@K = (# relevant documents retrieved in top K) /
+    (# relevant documents available in candidate pool).
+    Without manual labels or a fully judged corpus, candidate_pool is the
+    evaluator-visible retrieved pool, so this is proxy recall.
+    """
     try:
+        retrieved_labels = semantic_relevance_labels(
+            query,
+            chunks,
+            threshold
+        )
+
+        pool = candidate_pool if candidate_pool is not None else chunks
+
+        pool_labels = semantic_relevance_labels(
+            query,
+            pool,
+            threshold
+        )
+
+        relevant_available = sum(pool_labels)
+
+        if relevant_available == 0:
+            return 0.0
+
+        return sum(retrieved_labels[:k]) / relevant_available
+
+    except Exception:
+        return 0.0
+
+
+def mrr(chunks, query, threshold=None):
+    """
+    MRR = 1 / rank_of_first_relevant_document.
+    Ranks are one-based and relevance comes from the semantic binary label.
+    """
+    try:
+        labels = semantic_relevance_labels(
+            query,
+            chunks,
+            threshold
+        )
+
+        for i, label in enumerate(labels):
+
+            if label:
+                return 1.0 / (i + 1)
+
+        return 0.0
+
+    except Exception:
+        return 0.0
+
+
+def hit_rate(chunks, query, k=5, threshold=None):
+    """
+    HitRate@K = 1 if at least one relevant document exists in top K else 0.
+    """
+    try:
+        labels = semantic_relevance_labels(
+            query,
+            chunks,
+            threshold
+        )
+
+        return float(
+            int(
+                any(labels[:k])
+            )
+        )
+
+    except Exception:
+        return 0.0
+
+
+def ndcg(chunks, query, k=5, threshold=None):
+    """
+    DCG@K = sum((2^rel_i - 1) / log2(i + 1)).
+    NDCG@K = DCG@K / IDCG@K.
+    rel_i is the semantic binary relevance label at one-based rank i.
+    """
+    try:
+        labels = semantic_relevance_labels(
+            query,
+            chunks,
+            threshold
+        )
+
+        if not labels:
+            return 0.0
+
         dcg = 0.0
-        for i, pid in enumerate(pred_ids[:k]):
-            if pid in gt_ids:
-                dcg += 1.0 / np.log2(i + 2)
-        ideal = sum(1.0 / np.log2(i + 2) for i in range(min(len(gt_ids), k)))
+
+        for i, rel in enumerate(labels[:k], start=1):
+            dcg += (
+                (2 ** rel - 1)
+                / np.log2(i + 1)
+            )
+
+        ideal_labels = sorted(
+            labels,
+            reverse=True
+        )[:k]
+
+        ideal = sum(
+            (2 ** rel - 1) / np.log2(i + 1)
+            for i, rel in enumerate(
+                ideal_labels,
+                start=1
+            )
+        )
+
         return dcg / ideal if ideal > 0 else 0.0
-    except Exception: return 0.0
+
+    except Exception:
+        return 0.0
 
 # -------------------------------
 # 🔹 FAITHFULNESS & RELEVANCE

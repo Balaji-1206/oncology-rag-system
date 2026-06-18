@@ -5,6 +5,7 @@ SESSION = requests.Session()
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
+#MODEL = "hf.co/QuantFactory/Llama3-Med42-8B-GGUF:Q4_K_M" 
 MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q4_K_M"
 
 

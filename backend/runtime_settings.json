@@ -2,5 +2,6 @@
   "enable_laqa": true,
   "enable_mrl": true,
   "full_embedding_dimension": 256,
-  "mrl_dimension": 512
+  "mrl_dimension": 512,
+  "retrieval_relevance_threshold": 0.65
 }

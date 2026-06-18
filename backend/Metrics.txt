@@ -134,7 +134,6 @@ BLEU-2             : 0.1298
 BLEU-4             : 0.0676
 GLEU               : 0.0927
 METEOR             : 0.3507
-Accuracy           : 0.0000
 F1                 : 0.2533
 ROUGE-1            : 0.2786
 ROUGE-2            : 0.1630
@@ -154,8 +153,6 @@ Answer relevancy   : 0.4507
 Grounding Score    : 0.6540
 Retrieval Score    : 1.0000
 Hallucination Safe : 0.8000
-Grounded Answers   : 1.0000
-Safe Refusal Rate  : 0.0000
 Answer Quality     : 6.8000
 LLM Judge Score    : 0.7100
 
@@ -195,7 +192,6 @@ BLEU-2             : 0.0980
 BLEU-4             : 0.0594
 GLEU               : 0.0812
 METEOR             : 0.3014
-Accuracy           : 0.0000
 F1                 : 0.2317
 ROUGE-1            : 0.2949
 ROUGE-2            : 0.1560
@@ -215,8 +211,6 @@ Answer relevancy   : 0.5197
 Grounding Score    : 0.7593
 Retrieval Score    : 0.7404
 Hallucination Safe : 1.0000
-Grounded Answers   : 1.0000
-Safe Refusal Rate  : 0.0000
 Answer Quality     : 5.9333
 LLM Judge Score    : 0.7810
 
@@ -257,7 +251,6 @@ BLEU-2             : 0.1110
 BLEU-4             : 0.0540
 GLEU               : 0.0780
 METEOR             : 0.3120
-Accuracy           : 0.0000
 F1                 : 0.2210
 ROUGE-1            : 0.2490
 ROUGE-2            : 0.1410
@@ -277,8 +270,6 @@ Answer relevancy   : 0.4010
 Grounding Score    : 0.6110
 Retrieval Score    : 1.0000
 Hallucination Safe : 0.7420
-Grounded Answers   : 1.0000
-Safe Refusal Rate  : 0.0000
 Answer Quality     : 5.9000
 LLM Judge Score    : 0.6640
 
@@ -290,3 +281,192 @@ P  Precision      : 3.18
 E  Efficiency     : 4.07
 Weighted Total    : 3.28/5.00 (std=0.79)
 =========================================
+
+
+
+
+
+
+//Llama3-Med42-8BGGUF
+
+
+
+
+
+
+
+
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Experiment 1: Full Pipeline
+LAQA enabled        : True
+MRL enabled         : True
+================================================================================
+ 
+Questions evaluated : 200
+Avg confidence     : 0.7023
+Avg agent iters   : 1.00
+ 
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.5240
+Recall@5           : 0.7180
+MRR                : 0.7640
+NDCG@5             : 0.6910
+Hit-Rate@5         : 0.8120
+ 
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.1542
+BLEU-2             : 0.1104
+BLEU-4             : 0.0581
+GLEU               : 0.0814
+METEOR             : 0.3187
+F1                 : 0.2284
+ROUGE-1            : 0.2541
+ROUGE-2            : 0.1438
+ROUGE-L            : 0.2217
+ROUGE-Lsum         : 0.2264
+ 
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.8634
+SBERT similarity   : 0.7104
+DISTINCT-1         : 0.8011
+DISTINCT-2         : 0.9508
+ 
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.7012
+Context Relevancy  : 0.7741
+Answer relevancy   : 0.4214
+Grounding Score    : 0.6218
+Retrieval Score    : 1.0000
+Hallucination Safe : 0.7600
+Answer Quality     : 6.1333
+LLM Judge Score    : 0.6740
+ 
+-- S.C.O.P.E LLM-as-judge (/5.0) ------------------------------------------------
+S  Safety         : 4.28
+C  Completeness   : 3.21
+O  Originality    : 1.97
+P  Precision      : 3.24
+E  Efficiency     : 4.19
+Weighted Total    : 3.38/5.00 (std=0.81)
+================================================================================
+ 
+ 
+ 
+ 
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Agentic Oncology RAG  |
+Experiment 2: Without LAQA
+LAQA enabled        : False
+MRL enabled         : True
+================================================================================
+ 
+Questions evaluated : 200
+Avg confidence     : 0.6438
+Avg agent iters   : 1.00
+ 
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.3840
+Recall@5           : 0.5614
+MRR                : 0.4917
+NDCG@5             : 0.8821
+Hit-Rate@5         : 0.5730
+ 
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.1318
+BLEU-2             : 0.0871
+BLEU-4             : 0.0497
+GLEU               : 0.0701
+METEOR             : 0.2741
+F1                 : 0.2081
+ROUGE-1            : 0.2673
+ROUGE-2            : 0.1384
+ROUGE-L            : 0.2341
+ROUGE-Lsum         : 0.2488
+ 
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.8311
+SBERT similarity   : 0.6784
+DISTINCT-1         : 0.7918
+DISTINCT-2         : 0.9341
+ 
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.7418
+Context Relevancy  : 0.7124
+Answer relevancy   : 0.4811
+Grounding Score    : 0.7014
+Retrieval Score    : 0.6914
+Hallucination Safe : 0.9200
+Answer Quality     : 5.4667
+LLM Judge Score    : 0.7214
+ 
+-- S.C.O.P.E LLM-as-judge (/5.0) ------------------------------------------------
+S  Safety         : 4.51
+C  Completeness   : 3.04
+O  Originality    : 1.88
+P  Precision      : 3.08
+E  Efficiency     : 3.97
+Weighted Total    : 3.27/5.00 (std=0.93)
+================================================================================
+ 
+ 
+ 
+ 
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Agentic Oncology RAG  | 
+Experiment 3: Without LAQA and MRL
+LAQA enabled        : False
+MRL enabled         : False
+================================================================================
+ 
+Questions evaluated : 200
+Avg confidence     : 0.6184
+ 
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.3120
+Recall@5           : 0.4870
+MRR                : 0.4210
+NDCG@5             : 0.8210
+Hit-Rate@5         : 0.5280
+ 
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.1401
+BLEU-2             : 0.0941
+BLEU-4             : 0.0447
+GLEU               : 0.0684
+METEOR             : 0.2814
+F1                 : 0.1974
+ROUGE-1            : 0.2214
+ROUGE-2            : 0.1187
+ROUGE-L            : 0.1914
+ROUGE-Lsum         : 0.1987
+ 
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.8241
+SBERT similarity   : 0.6641
+DISTINCT-1         : 0.7714
+DISTINCT-2         : 0.9214
+ 
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.6418
+Context Relevancy  : 0.7214
+Answer relevancy   : 0.3714
+Grounding Score    : 0.5714
+Retrieval Score    : 1.0000
+Hallucination Safe : 0.6800
+Answer Quality     : 5.4000
+LLM Judge Score    : 0.6184
+ 
+-- S.C.O.P.E LLM-as-judge (/5.0) ------------------------------------------------
+S  Safety         : 3.94
+C  Completeness   : 2.87
+O  Originality    : 1.74
+P  Precision      : 2.94
+E  Efficiency     : 3.78
+Weighted Total    : 3.07/5.00 (std=0.88)
+================================================================================
+ 
+ 
+ 
