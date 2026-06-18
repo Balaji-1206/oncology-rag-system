@@ -2,6 +2,8 @@ import json
 import os
 from threading import Lock
 
+from utils.metadata_tools import classify_query_metadata
+
 
 # =========================================================
 # GLOBAL FEATURE FLAGS - DO NOT EDIT
@@ -209,10 +211,18 @@ def get_database_path():
 
 def build_raw_query_payload(user_query):
 
+    query_metadata = classify_query_metadata(
+        query=user_query,
+        keywords=[],
+        query_type="general",
+        expanded_query=user_query
+    )
+
     return {
         "intent": "factual",
         "query_type": "general",
         "keywords": [],
+        "query_metadata": query_metadata,
         "expanded_query": user_query,
         "retrieval_k": 5,
         "original_query": user_query,

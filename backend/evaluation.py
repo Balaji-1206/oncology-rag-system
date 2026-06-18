@@ -492,6 +492,11 @@ def evaluate(dataset_path):
             **medical_metrics
         }
 
+        res["retrieval_diagnostics"] = evaluation.get(
+            "retrieval_diagnostics",
+            []
+        )
+
         results.append(res)
 
         predictions.append(pred)

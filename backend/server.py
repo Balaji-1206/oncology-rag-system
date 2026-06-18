@@ -144,6 +144,11 @@ def safe_response(result):
             "keywords": query_analysis.get(
                 "keywords",
                 []
+            ),
+
+            "query_metadata": query_analysis.get(
+                "query_metadata",
+                {}
             )
         },
 

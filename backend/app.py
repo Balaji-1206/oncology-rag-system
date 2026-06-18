@@ -219,6 +219,11 @@ def handle_query(user_query: str):
 
                 "keywords": laqa_output.get(
                     "keywords"
+                ),
+
+                "query_metadata": laqa_output.get(
+                    "query_metadata",
+                    {}
                 )
             }
         }

@@ -4,11 +4,14 @@ import pickle
 import os
 import re
 import json
+import sys
 from datetime import datetime
 
 from rank_bm25 import BM25Okapi
 
 import settings
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from modules.embeddings.mrl_embeddings import (
     get_mrl_embedding
@@ -18,6 +21,7 @@ from modules.chunking.chunker import (
     load_pdfs,
     chunk_text
 )
+from utils.metadata_tools import normalize_metadata_record
 
 # =========================================================
 # 🔹 PATHS
@@ -140,25 +144,21 @@ for doc in documents:
     sections.append(section)
 
     # 🔥 metadata map
-    chunk_metadata[doc_id] = {
-
-        "section": section,
-
-        "source_doc": doc.get(
-            "doc_id",
-            "unknown"
-        ),
-
-        "metadata": doc.get(
-            "metadata",
-            ""
-        ),
-
-        "length": doc.get(
-            "length",
-            len(text.split())
-        )
-    }
+    chunk_metadata[doc_id] = normalize_metadata_record(
+        {
+            **doc,
+            "section": section,
+            "source_document": doc.get(
+                "source_document",
+                doc.get("doc_id", "unknown")
+            ),
+            "metadata": doc.get(
+                "metadata",
+                {}
+            )
+        },
+        fallback_id=doc_id
+    )
 
 print(f"📚 Total chunks: {len(texts)}")
 

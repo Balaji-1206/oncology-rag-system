@@ -47,12 +47,9 @@ from metrics import (
 # =========================================================
 
 questions = [
-
-    "What are the common side effects of chemotherapy?",
-    "How does immunotherapy work in cancer treatment?",
-    "What are the latest advancements in targeted therapy for lung cancer?",
-    "How can I manage fatigue during cancer treatment?",
-    "What are the dietary recommendations for cancer patients?"
+    "What are the common side effects of chemotherapy?"
+    "In lung cancer staging, what is the significance of a mediastinal lymph node measuring 1.5 cm on a CT scan?",
+    "What percentage of patients with Small Cell Lung Cancer (SCLC) have neurologically asymptomatic brain metastases?"
 ]
 
 # =========================================================

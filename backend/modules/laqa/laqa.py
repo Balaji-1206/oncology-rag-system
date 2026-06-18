@@ -3,6 +3,8 @@ import json
 import re
 import settings
 
+from utils.metadata_tools import classify_query_metadata
+
 SESSION = requests.Session()
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -41,31 +43,76 @@ def clean_query(text):
 
     text = text.lower().strip()
 
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
+    # Remove extra whitespace
+    text = re.sub(r"\s+", " ", text)
+
+    # Remove special characters except useful medical separators
+    text = re.sub(r"[^\w\s\-\/]", " ", text)
+
+    text = re.sub(r"\s+", " ", text)
 
     fixes = {
 
+        # General medical typos
         "symtoms": "symptoms",
-
+        "symptomps": "symptoms",
         "tretment": "treatment",
-
+        "treatement": "treatment",
         "diagnsis": "diagnosis",
+        "diagonsis": "diagnosis",
+        "diagosis": "diagnosis",
+        "prognsis": "prognosis",
 
+        # Therapy typos
         "chemo therapy": "chemotherapy",
-
+        "chemo-therapy": "chemotherapy",
         "immuno therapy": "immunotherapy",
+        "radio therapy": "radiotherapy",
+        "targeted therapys": "targeted therapy",
+
+        # Cancer typos
+        "tumour": "tumor",
+        "carcinomaa": "carcinoma",
+        "metastatis": "metastasis",
+
+        # Common abbreviations
+        "nsclc": "non small cell lung cancer",
+        "sclc": "small cell lung cancer",
+        "aml": "acute myeloid leukemia",
+        "all": "acute lymphoblastic leukemia",
+        "cll": "chronic lymphocytic leukemia",
+        "cml": "chronic myeloid leukemia",
+
+        # Treatment abbreviations
+        "rt": "radiotherapy",
+        "ct": "chemotherapy",
+        "io": "immunotherapy",
+
+        # Oncology abbreviations
+        "os": "overall survival",
+        "dfs": "disease free survival",
+        "pfs": "progression free survival",
+        "orr": "objective response rate",
+
+        # Diagnostic abbreviations
+        "mri": "magnetic resonance imaging",
+        "ct scan": "computed tomography scan",
+        "pet ct": "positron emission tomography computed tomography"
     }
 
     for wrong, correct in fixes.items():
+        text = text.replace(wrong, correct)
 
-        text = text.replace(
-            wrong,
-            correct
+    words = text.split()
+
+    normalized = []
+
+    for word in words:
+        normalized.append(
+            fixes.get(word, word)
         )
+
+    text = " ".join(normalized)
 
     return text.strip()
 
@@ -75,10 +122,17 @@ def clean_query(text):
 # =========================================================
 def tokenize(text):
 
-    return re.findall(
-        r"\b[a-zA-Z0-9\-]+\b",
-        text.lower()
+    if not text:
+        return []
+
+    text = text.lower().strip()
+
+    tokens = re.findall(
+        r"[a-zA-Z0-9]+(?:[-+/][a-zA-Z0-9]+)*",
+        text
     )
+
+    return tokens
 
 
 # =========================================================
@@ -86,128 +140,172 @@ def tokenize(text):
 # =========================================================
 def detect_query_type(query):
 
-    q = query.lower()
+    q = query.lower().strip()
 
-    list_patterns = [
+    patterns = {
 
-        "list",
+        "comparison": [
+            "difference between",
+            "compare",
+            "comparison",
+            "vs",
+            "versus"
+        ],
 
-        "types",
+        "ranking": [
+            "rank",
+            "ranking",
+            "top",
+            "most common",
+            "least common",
+            "best",
+            "highest",
+            "lowest"
+        ],
 
-        "type of",
+        "list": [
+            "list",
+            "types",
+            "type of",
+            "kinds of",
+            "categories",
+            "classification"
+        ],
 
-        "kinds of",
+        "definition": [
+            "what is",
+            "define",
+            "meaning of",
+            "explain",
+            "describe"
+        ],
 
-        "categories",
+        "symptoms": [
+            "symptoms",
+            "signs",
+            "clinical presentation",
+            "manifestations"
+        ],
 
-        "classification"
-    ]
+        "diagnosis": [
+            "diagnosis",
+            "diagnostic",
+            "detect",
+            "identify",
+            "screening",
+            "biopsy",
+            "test"
+        ],
 
-    ranking_patterns = [
+        "treatment": [
+            "treatment",
+            "therapy",
+            "drug",
+            "medicine",
+            "management",
+            "intervention"
+        ],
 
-        "rank",
+        "side_effects": [
+            "side effects",
+            "adverse effects",
+            "toxicity",
+            "complications",
+            "adverse events"
+        ],
 
+        "prognosis": [
+            "prognosis",
+            "survival",
+            "outcome",
+            "life expectancy",
+            "mortality"
+        ],
+
+        "staging": [
+            "staging",
+            "stage",
+            "tnm",
+            "cancer stage"
+        ],
+
+        "prevention": [
+            "prevention",
+            "prevent",
+            "risk reduction"
+        ],
+
+        "risk_factors": [
+            "risk factors",
+            "causes",
+            "cause",
+            "etiology",
+            "predispose"
+        ],
+
+        "clinical_trials": [
+            "clinical trial",
+            "phase i",
+            "phase ii",
+            "phase iii",
+            "research study"
+        ],
+
+        "epidemiology": [
+            "incidence",
+            "prevalence",
+            "epidemiology",
+            "frequency"
+        ]
+    }
+
+    # Highest priority checks
+    for query_type in [
+        "comparison",
         "ranking",
+        "list",
+        "definition"
+    ]:
 
-        "most common",
+        for p in patterns[query_type]:
 
-        "least common",
+            if p in q:
+                return query_type
 
-        "top"
-    ]
+    # Domain-specific checks
+    for query_type, keywords in patterns.items():
 
-    definition_patterns = [
+        if query_type in {
+            "comparison",
+            "ranking",
+            "list",
+            "definition"
+        }:
+            continue
 
-        "what is",
+        for kw in keywords:
 
-        "define",
+            if kw in q:
+                return query_type
 
-        "meaning of",
-
-        "explain"
-    ]
-
-    comparison_patterns = [
-
-        "difference between",
-
-        "compare",
-
-        "vs",
-
-        "versus"
-    ]
-
-    yesno_patterns = [
-
-        "does",
-
-        "can",
-
+    yesno_starters = (
         "is",
-
         "are",
+        "does",
+        "do",
+        "can",
+        "could",
+        "should",
+        "will",
+        "would",
+        "has",
+        "have"
+    )
 
-        "will"
-    ]
-
-    symptom_patterns = [
-
-        "symptoms",
-
-        "signs",
-
-        "indications"
-    ]
-
-    treatment_patterns = [
-
-        "treatment",
-
-        "therapy",
-
-        "drug",
-
-        "medicine"
-    ]
-
-    for p in ranking_patterns:
-
-        if p in q:
-            return "ranking"
-
-    for p in list_patterns:
-
-        if p in q:
-            return "list"
-
-    for p in definition_patterns:
-
-        if p in q:
-            return "definition"
-
-    for p in comparison_patterns:
-
-        if p in q:
-            return "comparison"
-
-    for p in symptom_patterns:
-
-        if p in q:
-            return "symptoms"
-
-    for p in treatment_patterns:
-
-        if p in q:
-            return "treatment"
-
-    for p in yesno_patterns:
-
-        if q.startswith(p):
-            return "yesno"
+    if q.startswith(yesno_starters):
+        return "yesno"
 
     return "general"
-
 
 # =========================================================
 # 🔹 SIMPLE QUERY DETECTION
@@ -216,131 +314,227 @@ def is_simple_query(query):
 
     tokens = tokenize(query)
 
-    simple_triggers = {
+    if len(tokens) > 12:
+        return False
 
+    simple_patterns = {
+        "what is",
+        "define",
+        "meaning of",
         "list",
-        "type",
-        "types",
-        "kind",
-        "kinds",
-        "common",
-        "top",
-        "what",
-        "define"
+        "types of",
+        "kinds of"
     }
 
-    return (
-        len(tokens) <= 7
-        or
-        bool(simple_triggers & set(tokens))
-    )
+    q = query.lower().strip()
+
+    for pattern in simple_patterns:
+
+        if q.startswith(pattern):
+            return True
+
+    complex_keywords = {
+
+        "compare",
+        "versus",
+        "vs",
+
+        "difference",
+
+        "treatment",
+
+        "therapy",
+
+        "diagnosis",
+
+        "staging",
+
+        "prognosis",
+
+        "survival",
+
+        "metastasis",
+
+        "mechanism",
+
+        "pathogenesis",
+
+        "side effects",
+
+        "adverse effects",
+
+        "clinical trial",
+
+        "risk factors"
+    }
+
+    for kw in complex_keywords:
+
+        if kw in q:
+            return False
+
+    return len(tokens) <= 5
 
 
 # =========================================================
 # 🔹 DETERMINISTIC EXPANSION
 # =========================================================
+import re
+
 def deterministic_expansion(
     query,
     query_type
 ):
 
-    # -----------------------------------
-    # LIST QUERIES
-    # -----------------------------------
+    query = query.lower().strip()
+
+    # -----------------------------
+    # LIST
+    # -----------------------------
     if query_type == "list":
-
-        if re.search(
-            r"\bcancers?\b|\btumou?rs?\b|\bmalignan",
-            query
-        ):
-
-            return (
-                query
-                +
-                " oncology classification"
-            )
 
         return (
             query
-            +
-            " oncology categories"
+            + " classification categories subtypes"
         )
 
-    # -----------------------------------
-    # RANKING QUERIES
-    # -----------------------------------
+    # -----------------------------
+    # RANKING
+    # -----------------------------
     if query_type == "ranking":
 
         return (
             query
-            +
-            " oncology ranked categories"
+            + " prevalence incidence frequency ranking"
         )
 
-    # -----------------------------------
+    # -----------------------------
     # DEFINITION
-    # -----------------------------------
+    # -----------------------------
     if query_type == "definition":
 
         return (
             query
-            +
-            " disease definition overview"
+            + " definition overview description"
         )
 
-    # -----------------------------------
+    # -----------------------------
     # SYMPTOMS
-    # -----------------------------------
+    # -----------------------------
     if query_type == "symptoms":
 
         return (
             query
-            +
-            " symptoms signs clinical presentation"
+            + " symptoms signs manifestations clinical presentation"
         )
 
-    # -----------------------------------
+    # -----------------------------
+    # DIAGNOSIS
+    # -----------------------------
+    if query_type == "diagnosis":
+
+        return (
+            query
+            + " diagnosis diagnostic criteria biopsy imaging screening evaluation"
+        )
+
+    # -----------------------------
     # TREATMENT
-    # -----------------------------------
+    # -----------------------------
     if query_type == "treatment":
 
         return (
             query
-            +
-            " treatment therapy management"
+            + " treatment therapy management chemotherapy immunotherapy radiotherapy surgery"
         )
 
-    # -----------------------------------
+    # -----------------------------
+    # SIDE EFFECTS
+    # -----------------------------
+    if query_type == "side_effects":
+
+        return (
+            query
+            + " adverse effects toxicity complications treatment toxicity"
+        )
+
+    # -----------------------------
+    # PROGNOSIS
+    # -----------------------------
+    if query_type == "prognosis":
+
+        return (
+            query
+            + " prognosis survival outcome overall survival disease free survival"
+        )
+
+    # -----------------------------
+    # STAGING
+    # -----------------------------
+    if query_type == "staging":
+
+        return (
+            query
+            + " cancer stage tnm staging classification"
+        )
+
+    # -----------------------------
+    # RISK FACTORS
+    # -----------------------------
+    if query_type == "risk_factors":
+
+        return (
+            query
+            + " risk factors causes etiology predisposition"
+        )
+
+    # -----------------------------
+    # PREVENTION
+    # -----------------------------
+    if query_type == "prevention":
+
+        return (
+            query
+            + " prevention screening risk reduction protective factors"
+        )
+
+    # -----------------------------
+    # CLINICAL TRIALS
+    # -----------------------------
+    if query_type == "clinical_trials":
+
+        return (
+            query
+            + " clinical trial study evidence phase i phase ii phase iii"
+        )
+
+    # -----------------------------
     # COMPARISON
-    # -----------------------------------
+    # -----------------------------
     if query_type == "comparison":
 
         return (
             query
-            +
-            " comparison differences"
+            + " comparison differences advantages disadvantages"
         )
 
-    # -----------------------------------
-    # YES / NO
-    # -----------------------------------
+    # -----------------------------
+    # YESNO
+    # -----------------------------
     if query_type == "yesno":
 
         return (
             query
-            +
-            " medical evidence"
+            + " evidence recommendation guideline"
         )
 
-    # -----------------------------------
+    # -----------------------------
     # GENERAL
-    # -----------------------------------
+    # -----------------------------
     return (
         query
-        +
-        " oncology information"
+        + " oncology cancer information"
     )
-
 
 # =========================================================
 # 🔹 SAFE QUERY ENRICHMENT
@@ -369,25 +563,40 @@ def enrich_query(query):
 # =========================================================
 def choose_k(query_type):
 
-    if query_type in [
-        "list",
-        "ranking"
-    ]:
-        return 7
+    k_map = {
 
-    if query_type == "definition":
-        return 4
+        "definition": 4,
 
-    if query_type == "symptoms":
-        return 6
+        "yesno": 4,
 
-    if query_type == "comparison":
-        return 6
+        "symptoms": 6,
 
-    if query_type == "treatment":
-        return 6
+        "diagnosis": 6,
 
-    return 5
+        "treatment": 7,
+
+        "side_effects": 7,
+
+        "comparison": 8,
+
+        "staging": 7,
+
+        "prognosis": 7,
+
+        "risk_factors": 6,
+
+        "prevention": 6,
+
+        "clinical_trials": 8,
+
+        "list": 8,
+
+        "ranking": 10,
+
+        "epidemiology": 7
+    }
+
+    return k_map.get(query_type, 5)
 
 
 # =========================================================
@@ -395,21 +604,40 @@ def choose_k(query_type):
 # =========================================================
 def detect_intent(query_type):
 
-    if query_type in [
-        "definition",
-        "symptoms",
-        "yesno",
-        "list",
-        "ranking"
-    ]:
-        return "factual"
+    intent_map = {
 
-    if query_type == "comparison":
-        return "comparison"
+        # Direct factual retrieval
+        "definition": "factual",
+        "symptoms": "factual",
+        "diagnosis": "factual",
+        "staging": "factual",
+        "epidemiology": "factual",
+        "yesno": "factual",
 
-    return "exploratory"
+        # Enumerative answers
+        "list": "enumeration",
+        "ranking": "enumeration",
 
+        # Analytical reasoning
+        "comparison": "analytical",
 
+        # Treatment guidance
+        "treatment": "clinical_guidance",
+        "side_effects": "clinical_guidance",
+        "prevention": "clinical_guidance",
+        "risk_factors": "clinical_guidance",
+
+        # Outcome-focused
+        "prognosis": "outcome_analysis",
+
+        # Research-oriented
+        "clinical_trials": "research"
+    }
+
+    return intent_map.get(
+        query_type,
+        "exploratory"
+    )
 # =========================================================
 # 🔹 KEYWORD EXTRACTION
 # =========================================================
@@ -417,29 +645,46 @@ def extract_keywords(query):
 
     stopwords = {
 
-        "what",
-        "is",
-        "the",
-        "of",
-        "a",
-        "an",
-        "does",
-        "can",
-        "are",
-        "and",
-        "to"
+        "what", "is", "the", "of", "a", "an",
+        "does", "can", "are", "and", "to",
+        "in", "on", "for", "with", "by",
+        "how", "why", "when", "where",
+        "which", "who", "whom",
+
+        "explain",
+        "describe",
+        "define",
+        "list",
+        "compare",
+        "difference",
+        "between",
+        "versus",
+        "vs",
+
+        "tell",
+        "show",
+        "give"
     }
 
-    words = tokenize(query)
+    tokens = tokenize(query)
 
-    keywords = [
+    keywords = []
 
-        w for w in words
+    seen = set()
 
-        if w not in stopwords
-    ]
+    for token in tokens:
 
-    return keywords[:8]
+        if token in stopwords:
+            continue
+
+        if len(token) < 3:
+            continue
+
+        if token not in seen:
+            keywords.append(token)
+            seen.add(token)
+
+    return keywords[:10]
 
 
 # =========================================================
@@ -525,48 +770,65 @@ def should_use_llm_expansion(
     query_type
 ):
 
-    if intent != "exploratory":
-        return False
-
-    if query_type in [
-        "list",
-        "ranking",
-        "definition",
-        "yesno"
-    ]:
+    if len(tokenize(query)) < 6:
         return False
 
     if is_simple_query(query):
         return False
 
-    return True
+    if query_type in {
+        "definition",
+        "list",
+        "ranking",
+        "yesno",
+        "symptoms",
+        "diagnosis",
+        "staging"
+    }:
+        return False
 
+    return intent in {
+        "analytical",
+        "clinical_guidance",
+        "outcome_analysis",
+        "research",
+        "exploratory"
+    }
 
 # =========================================================
 # 🔹 DOMAIN SAFE EXPANSION
 # =========================================================
+import re
+
 def domain_safe_expansion(
     original_query,
     expanded_query,
     query_type
 ):
 
+    # --------------------------------------------------
+    # Remove obviously irrelevant domain drift
+    # --------------------------------------------------
     banned_patterns = [
 
         r"\blegal\b",
         r"\blaw\b",
+
         r"\bfinancial\b",
         r"\bfinance\b",
         r"\beconomic\b",
-        r"\bprevalence\b",
-        r"\bincidence\b",
-        r"\bpopulation statistics?\b",
-        r"\badult populations?\b",
-        r"\bepidemiolog",
+
         r"\bstudy design\b",
         r"\bretrieval query\b",
+
         r"\bacademic\b",
-        r"\bliterature review\b"
+        r"\bliterature review\b",
+
+        r"\bmarketing\b",
+        r"\bbusiness\b",
+
+        r"\bpolitical\b",
+        r"\bgovernment policy\b"
     ]
 
     safe = expanded_query.lower().strip()
@@ -576,7 +838,8 @@ def domain_safe_expansion(
         safe = re.sub(
             pattern,
             " ",
-            safe
+            safe,
+            flags=re.IGNORECASE
         )
 
     safe = re.sub(
@@ -585,6 +848,9 @@ def domain_safe_expansion(
         safe
     ).strip()
 
+    # --------------------------------------------------
+    # Ensure original query remains intact
+    # --------------------------------------------------
     original = original_query.lower().strip()
 
     if not safe.startswith(original):
@@ -595,10 +861,16 @@ def domain_safe_expansion(
             + safe
         )
 
+    # --------------------------------------------------
+    # Tokenize
+    # --------------------------------------------------
     original_tokens = tokenize(original)
 
     safe_tokens = tokenize(safe)
 
+    # --------------------------------------------------
+    # Keep only newly-added tokens
+    # --------------------------------------------------
     added = [
 
         token for token in safe_tokens
@@ -606,30 +878,127 @@ def domain_safe_expansion(
         if token not in original_tokens
     ]
 
-    max_added_words = 12
+    # --------------------------------------------------
+    # Query-type-specific limits
+    # --------------------------------------------------
+    limits = {
 
-    if (
-        query_type in [
-            "general",
-            "list",
-            "ranking",
-            "definition"
-        ]
-        or
-        is_simple_query(original)
-    ):
+        "definition": 6,
 
-        max_added_words = 8
+        "yesno": 6,
 
-    final_tokens = (
-        original_tokens
-        +
-        added[:max_added_words]
+        "symptoms": 8,
+
+        "diagnosis": 8,
+
+        "staging": 8,
+
+        "risk_factors": 8,
+
+        "prevention": 8,
+
+        "treatment": 10,
+
+        "side_effects": 10,
+
+        "prognosis": 10,
+
+        "comparison": 12,
+
+        "clinical_trials": 14,
+
+        "ranking": 8,
+
+        "list": 8,
+
+        "general": 8
+    }
+
+    max_added_words = limits.get(
+        query_type,
+        8
     )
 
+    added = added[:max_added_words]
+
+    # --------------------------------------------------
+    # Remove duplicates while preserving order
+    # --------------------------------------------------
+    seen = set()
+
+    final_tokens = []
+
+    for token in original_tokens + added:
+
+        if token not in seen:
+
+            final_tokens.append(token)
+
+            seen.add(token)
+
+    # --------------------------------------------------
+    # Oncology safety check
+    # Prevent weird LLM expansions
+    # --------------------------------------------------
+    oncology_terms = {
+
+        "cancer",
+        "tumor",
+        "tumour",
+        "oncology",
+
+        "chemotherapy",
+        "immunotherapy",
+        "radiotherapy",
+
+        "diagnosis",
+        "symptoms",
+
+        "treatment",
+        "therapy",
+
+        "prognosis",
+        "survival",
+
+        "metastasis",
+        "metastatic",
+
+        "staging",
+
+        "carcinoma",
+        "sarcoma",
+        "lymphoma",
+        "leukemia",
+        "melanoma",
+
+        "clinical",
+        "trial",
+
+        "toxicity",
+        "adverse",
+        "effects",
+
+        "screening",
+        "prevention",
+
+        "egfr",
+        "alk",
+        "her2",
+        "braf",
+        "pd-l1",
+        "car-t"
+    }
+
+    has_medical_signal = any(
+        token in oncology_terms
+        for token in final_tokens
+    )
+
+    if not has_medical_signal:
+
+        return original
+
     return " ".join(final_tokens)
-
-
 # =========================================================
 # 🔹 MAIN PROCESSOR
 # =========================================================
@@ -641,8 +1010,14 @@ def process_query(query):
             query
         )
 
+    # ------------------------------------
+    # CLEAN QUERY
+    # ------------------------------------
     query = clean_query(query)
 
+    # ------------------------------------
+    # DETECT QUERY TYPE
+    # ------------------------------------
     query_type = detect_query_type(
         query
     )
@@ -651,17 +1026,25 @@ def process_query(query):
         query_type
     )
 
-    # =====================================================
-    # 🔹 SAFE DETERMINISTIC EXPANSION
-    # =====================================================
+    query_complexity = (
+        "simple"
+        if is_simple_query(query)
+        else "complex"
+    )
+
+    # ------------------------------------
+    # DETERMINISTIC EXPANSION
+    # ------------------------------------
     expanded_query = deterministic_expansion(
         query,
         query_type
     )
 
-    # =====================================================
-    # 🔹 OPTIONAL LLM ENRICHMENT
-    # =====================================================
+    expansion_source = "deterministic"
+
+    # ------------------------------------
+    # OPTIONAL LLM EXPANSION
+    # ------------------------------------
     if should_use_llm_expansion(
         query,
         intent,
@@ -672,38 +1055,69 @@ def process_query(query):
             expanded_query
         )
 
-    # =====================================================
-    # 🔹 DOMAIN FILTERING
-    # =====================================================
+        expansion_source = "llm"
+
+    # ------------------------------------
+    # DOMAIN SAFETY
+    # ------------------------------------
     expanded_query = domain_safe_expansion(
         query,
         expanded_query,
         query_type
     )
 
-    # =====================================================
-    # 🔹 FINAL CLEANING
-    # =====================================================
+    # ------------------------------------
+    # FINAL ENRICHMENT
+    # ------------------------------------
     expanded_query = enrich_query(
         expanded_query
     )
 
-    keywords = extract_keywords(
-        query
+    # ------------------------------------
+    # KEYWORDS
+    # ------------------------------------
+    keywords = list(dict.fromkeys(
+
+        extract_keywords(query)
+
+        +
+
+        extract_keywords(expanded_query)
+
+    ))
+
+    # ------------------------------------
+    # QUERY METADATA
+    # ------------------------------------
+    query_metadata = classify_query_metadata(
+
+        query=query,
+
+        keywords=keywords,
+
+        query_type=query_type,
+
+        expanded_query=expanded_query
     )
 
-    # =====================================================
-    # 🔹 FINAL OUTPUT
-    # =====================================================
+    # ------------------------------------
+    # FINAL OUTPUT
+    # ------------------------------------
     final_output = {
 
         "intent": intent,
 
         "query_type": query_type,
 
+        "query_complexity": query_complexity,
+
         "keywords": keywords,
 
+        "query_metadata": query_metadata,
+
         "expanded_query": expanded_query,
+
+        "expansion_source": expansion_source,
 
         "retrieval_k": choose_k(
             query_type
@@ -712,9 +1126,9 @@ def process_query(query):
         "original_query": query
     }
 
-    # =====================================================
-    # 🔹 DEBUG
-    # =====================================================
+    # ------------------------------------
+    # DEBUG
+    # ------------------------------------
     print("\n🧠 LAQA PARSED:")
 
     print(

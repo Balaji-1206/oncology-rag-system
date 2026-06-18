@@ -15,6 +15,12 @@ from modules.embeddings.mrl_embeddings import (
     get_dynamic_mrl_embedding
 )
 
+from utils.metadata_tools import (
+    classify_query_metadata,
+    metadata_match_score,
+    normalize_metadata_record
+)
+
 # =========================================================
 # 🔹 BACKWARD COMPATIBILITY MIGRATION
 # =========================================================
@@ -213,7 +219,22 @@ def _reload_all_indexes(verbose=False):
         _CACHE["id_to_text"] = pickle.load(f)
 
     with open(f"{db_path}/chunks.pkl", "rb") as f:
-        _CACHE["chunk_metadata"] = pickle.load(f)
+        raw_chunks = pickle.load(f)
+
+    if isinstance(raw_chunks, dict):
+        _CACHE["chunk_metadata"] = {
+            doc_id: normalize_metadata_record(record, fallback_id=doc_id)
+            for doc_id, record in raw_chunks.items()
+        }
+    else:
+        _CACHE["chunk_metadata"] = {
+            record.get("id", f"chunk_{idx}"): normalize_metadata_record(
+                record,
+                fallback_id=record.get("id", f"chunk_{idx}")
+            )
+            for idx, record in enumerate(raw_chunks or [])
+            if isinstance(record, dict)
+        }
 
     _CACHE["current_db_path"] = db_path
 
@@ -306,6 +327,25 @@ def normalize_scores(scores):
         return np.zeros_like(scores)
 
     return (scores - scores.mean()) / std
+
+
+def normalize_unit_scores(scores):
+
+    scores = np.array(
+        scores,
+        dtype=np.float32
+    )
+
+    if len(scores) == 0:
+        return scores
+
+    min_score = float(scores.min())
+    max_score = float(scores.max())
+
+    if max_score == min_score:
+        return np.ones_like(scores) * 0.5
+
+    return (scores - min_score) / (max_score - min_score)
 
 
 # =========================================================
@@ -767,7 +807,15 @@ def hybrid_search(
             "backend/index_data.py after changing MRL mode."
         )
 
-    query = laqa_output["expanded_query"]
+    query = laqa_output.get(
+        "expanded_query",
+        laqa_output.get("original_query", "")
+    )
+
+    original_query = laqa_output.get(
+        "original_query",
+        query
+    )
 
     intent = laqa_output.get(
         "intent",
@@ -792,6 +840,18 @@ def hybrid_search(
 
     query_section = detect_query_section(
         query
+    )
+
+    query_metadata = laqa_output.get(
+        "query_metadata"
+    ) or classify_query_metadata(
+        query=original_query,
+        keywords=laqa_output.get(
+            "keywords",
+            []
+        ),
+        query_type=query_type,
+        expanded_query=query
     )
 
     # =====================================================
@@ -829,6 +889,7 @@ def hybrid_search(
     current_bm25 = get_bm25()
     current_ids = get_ids()
     current_id_to_text = get_id_to_text()
+    current_chunk_metadata = get_chunk_metadata()
 
     D, I = current_index.search(
         query_vec,
@@ -848,7 +909,7 @@ def hybrid_search(
 
         dense_scores.append(float(dist))
 
-    dense_scores = normalize_scores(
+    dense_scores = normalize_unit_scores(
         dense_scores
     )
 
@@ -868,7 +929,7 @@ def hybrid_search(
         for i in top_idx
     ]
 
-    sparse_scores = normalize_scores(
+    sparse_scores = normalize_unit_scores(
         [bm25_scores[i] for i in top_idx]
     )
 
@@ -932,11 +993,6 @@ def hybrid_search(
             text
         )
 
-        doc_score_map[doc_id] += metadata_alignment_boost(
-            query_tokens,
-            doc_id
-        )
-
         doc_score_map[doc_id] += entity_boost(
             query_entities,
             text
@@ -946,32 +1002,26 @@ def hybrid_search(
             text
         )
 
-    # =====================================================
-    # 🔹 HARD FILTERING
-    # =====================================================
-    filtered_scores = {}
+    semantic_scores_raw = {
+        doc_id: max(score, 0.0)
+        for doc_id, score in doc_score_map.items()
+    }
 
-    for doc_id, score in doc_score_map.items():
-
-        text = current_id_to_text[doc_id]
-
-        # Remove weak overlap docs
-        overlap = keyword_overlap_score(
-            query_tokens,
-            text
+    semantic_scores = {
+        doc_id: float(score)
+        for doc_id, score in zip(
+            semantic_scores_raw.keys(),
+            normalize_unit_scores(
+                list(semantic_scores_raw.values())
+            )
         )
-
-        if overlap < 0.03:
-
-            continue
-
-        filtered_scores[doc_id] = score
+    }
 
     # =====================================================
-    # 🔹 RANKING
+    # 🔹 SEMANTIC RANKING
     # =====================================================
-    ranked_docs = sorted(
-        filtered_scores.items(),
+    ranked_semantic_docs = sorted(
+        semantic_scores.items(),
         key=lambda x: x[1],
         reverse=True
     )
@@ -982,7 +1032,7 @@ def hybrid_search(
     candidate_ids = [
         doc_id
         for doc_id, _
-        in ranked_docs[:20]
+        in ranked_semantic_docs[:20]
     ]
 
     candidate_texts = [
@@ -1000,40 +1050,131 @@ def hybrid_search(
         return_scores=True
     )
 
+    reranker_score_map = {}
+
     # =====================================================
     # 🔹 RECOVER IDS
     # =====================================================
     reranked_ids = []
 
-    for text in reranked_texts:
+    used_ids = set()
+
+    for idx, text in enumerate(reranked_texts):
+
+        reranker_score = 0.0
+
+        if idx < len(reranker_scores):
+
+            reranker_score = float(reranker_scores[idx])
 
         for doc_id in candidate_ids:
+
+            if doc_id in used_ids:
+                continue
 
             if current_id_to_text[doc_id] == text:
 
                 reranked_ids.append(doc_id)
+                reranker_score_map[doc_id] = reranker_score
+                used_ids.add(doc_id)
                 break
+
+    for doc_id in candidate_ids:
+        reranker_score_map.setdefault(
+            doc_id,
+            0.0
+        )
+
+    # =====================================================
+    # 🔹 FINAL SCORE ASSEMBLY
+    # =====================================================
+    candidate_scores = {}
+
+    for doc_id in candidate_ids:
+
+        chunk_record = current_chunk_metadata.get(
+            doc_id,
+            {}
+        )
+
+        chunk_meta = chunk_record.get(
+            "metadata",
+            chunk_record
+        )
+
+        metadata_score = metadata_match_score(
+            query_metadata,
+            chunk_meta
+        )
+
+        semantic_score = float(
+            semantic_scores.get(
+                doc_id,
+                0.0
+            )
+        )
+
+        reranker_score = float(
+            1 / (
+                1 + np.exp(
+                    -reranker_score_map.get(
+                        doc_id,
+                        0.0
+                    )
+                )
+            )
+        )
+
+        final_score = (
+            0.70 * semantic_score
+            + 0.20 * reranker_score
+            + 0.10 * metadata_score
+        )
+
+        candidate_scores[doc_id] = {
+            "semantic_score": round(semantic_score, 3),
+            "metadata_score": round(metadata_score, 3),
+            "reranker_score": round(reranker_score, 3),
+            "final_score": round(max(0.0, min(final_score, 1.0)), 3)
+        }
+
+    ranked_candidates = sorted(
+        candidate_scores.items(),
+        key=lambda x: x[1]["final_score"],
+        reverse=True
+    )
 
     # =====================================================
     # 🔹 DIVERSITY FILTER
     # =====================================================
+    ranked_texts = [
+        current_id_to_text[doc_id]
+        for doc_id, _
+        in ranked_candidates
+    ]
+
+    ranked_ids = [
+        doc_id
+        for doc_id, _
+        in ranked_candidates
+    ]
+
     final_texts, final_ids = diversify_results(
-        reranked_texts,
-        reranked_ids,
+        ranked_texts,
+        ranked_ids,
         max_docs=4
     )
 
     # =====================================================
     # 🔹 RETRIEVAL SCORE
     # =====================================================
+    final_scores = [
+        candidate_scores.get(doc_id, {}).get("final_score", 0.0)
+        for doc_id in final_ids
+    ]
+
     retrieval_score = float(
-        np.mean(
-            [
-                score
-                for _, score
-                in ranked_docs[:5]
-            ]
-        )
+        np.mean(final_scores) if final_scores else 0.0
     )
 
     retrieval_score = max(
@@ -1075,6 +1216,58 @@ def hybrid_search(
         reranker_confidence = 0.0
 
     # =====================================================
+    # 🔹 DIAGNOSTICS
+    # =====================================================
+    retrieval_diagnostics = []
+
+    for doc_id in final_ids:
+
+        chunk_record = current_chunk_metadata.get(
+            doc_id,
+            {}
+        )
+
+        scores = candidate_scores.get(
+            doc_id,
+            {}
+        )
+
+        retrieval_diagnostics.append({
+
+            "doc_id": doc_id,
+
+            "text": current_id_to_text.get(
+                doc_id,
+                ""
+            ),
+
+            "metadata_score": scores.get(
+                "metadata_score",
+                0.0
+            ),
+
+            "semantic_score": scores.get(
+                "semantic_score",
+                0.0
+            ),
+
+            "reranker_score": scores.get(
+                "reranker_score",
+                0.0
+            ),
+
+            "final_score": scores.get(
+                "final_score",
+                0.0
+            ),
+
+            "metadata": chunk_record.get(
+                "metadata",
+                {}
+            )
+        })
+
+    # =====================================================
     # 🔹 DEBUG
     # =====================================================
     print("\n📄 Top Retrieved Docs:")
@@ -1098,5 +1291,9 @@ def hybrid_search(
 
         "retrieval_score": retrieval_score,
 
-        "reranker_confidence": reranker_confidence
+        "reranker_confidence": reranker_confidence,
+
+        "query_metadata": query_metadata,
+
+        "retrieval_diagnostics": retrieval_diagnostics
     }

@@ -1,94 +1,51 @@
-import re
-import requests
 import os
+import re
 
 from PyPDF2 import PdfReader
 
-# =========================================================
-# 🔹 CONFIG
-# =========================================================
-OLLAMA_URL = "http://localhost:11434/api/generate"
-
-MODEL = "phi3:mini"
+from utils.metadata_tools import (
+    classify_chunk_metadata
+)
 
 
 # =========================================================
 # 🔹 LOAD PDFS
 # =========================================================
-# =========================================================
-# 🔹 LOAD PDFS
-# =========================================================
-def load_pdfs(
-    folder_path,
-    limit=None
-):
+def load_pdfs(folder_path, limit=None):
 
     documents = []
 
-    pdf_files = [
+    pdf_files = [f for f in os.listdir(folder_path) if f.endswith(".pdf")]
 
-        f for f in os.listdir(folder_path)
-
-        if f.endswith(".pdf")
-    ]
-
-    # =====================================================
-    # 🔹 LIMIT PDF COUNT
-    # =====================================================
     if limit is not None:
-
         pdf_files = pdf_files[:limit]
 
-    print(
-        f"📄 PDFs selected: {len(pdf_files)}"
-    )
+    print(f"📄 PDFs selected: {len(pdf_files)}")
 
     for file in pdf_files:
 
-        path = os.path.join(
-            folder_path,
-            file
-        )
-
+        path = os.path.join(folder_path, file)
         print(f"📥 Loading: {file}")
 
         try:
-
             reader = PdfReader(path)
-
             text = ""
 
             for page in reader.pages:
-
                 extracted = page.extract_text()
-
                 if extracted:
                     text += extracted + "\n"
 
             text = text.strip()
 
-            # Skip tiny/broken PDFs
             if len(text) < 500:
-
-                print(
-                    f"⚠️ Skipping weak PDF: {file}"
-                )
-
+                print(f"⚠️ Skipping weak PDF: {file}")
                 continue
 
-            documents.append({
-
-                "id": file,
-
-                "text": text
-            })
+            documents.append({"id": file, "text": text})
 
         except Exception as e:
-
-            print(
-                f"❌ Failed loading {file}:",
-                e
-            )
+            print(f"❌ Failed loading {file}:", e)
 
     return documents
 
@@ -98,35 +55,11 @@ def load_pdfs(
 # =========================================================
 def clean_text(text):
 
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    text = re.sub(
-        r"[-=_]{2,}",
-        " ",
-        text
-    )
-
-    text = re.sub(
-        r"[^\x00-\x7F]+",
-        " ",
-        text
-    )
-
-    text = re.sub(
-        r"\.{2,}",
-        ".",
-        text
-    )
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[-=_]{2,}", " ", text)
+    text = re.sub(r"[^\x00-\x7F]+", " ", text)
+    text = re.sub(r"\.{2,}", ".", text)
+    text = re.sub(r"\s+", " ", text)
 
     return text.strip()
 
@@ -139,150 +72,185 @@ def detect_section(text):
     text_lower = text.lower()
 
     sections = {
-
         "symptoms": [
             "symptoms",
             "clinical presentation",
-            "signs"
+            "signs",
+            "manifestations",
+            "complaints",
+            "presenting symptoms"
         ],
-
         "diagnosis": [
             "diagnosis",
             "diagnostic",
-            "evaluation"
+            "evaluation",
+            "screening",
+            "biopsy",
+            "imaging",
+            "pathology",
+            "laboratory findings",
+            "diagnostic criteria"
         ],
-
         "treatment": [
             "treatment",
             "therapy",
-            "management"
+            "management",
+            "treatment options",
+            "therapeutic approach",
+            "intervention"
         ],
-
+        "chemotherapy": [
+            "chemotherapy",
+            "cytotoxic",
+            "adjuvant chemotherapy",
+            "neoadjuvant chemotherapy",
+            "chemotherapeutic"
+        ],
+        "radiotherapy": [
+            "radiotherapy",
+            "radiation therapy",
+            "irradiation",
+            "external beam radiation",
+            "brachytherapy"
+        ],
+        "immunotherapy": [
+            "immunotherapy",
+            "immune checkpoint",
+            "pembrolizumab",
+            "nivolumab",
+            "atezolizumab",
+            "car-t"
+        ],
+        "targeted_therapy": [
+            "targeted therapy",
+            "targeted treatment",
+            "egfr",
+            "alk",
+            "her2",
+            "braf",
+            "tyrosine kinase inhibitor"
+        ],
+        "surgery": [
+            "surgery",
+            "surgical",
+            "resection",
+            "operation",
+            "mastectomy",
+            "lumpectomy"
+        ],
         "staging": [
             "staging",
-            "tnm"
+            "tnm",
+            "stage i",
+            "stage ii",
+            "stage iii",
+            "stage iv",
+            "tumor stage"
         ],
-
         "prognosis": [
             "prognosis",
-            "survival"
+            "survival",
+            "overall survival",
+            "disease-free survival",
+            "outcome",
+            "mortality"
         ],
-
+        "side_effects": [
+            "side effects",
+            "adverse effects",
+            "toxicity",
+            "complications",
+            "treatment toxicity",
+            "adverse events"
+        ],
+        "prevention": [
+            "prevention",
+            "risk reduction",
+            "screening recommendations",
+            "preventive measures"
+        ],
+        "epidemiology": [
+            "incidence",
+            "prevalence",
+            "epidemiology",
+            "risk factors",
+            "population"
+        ],
         "mechanism": [
             "mechanism",
             "pathogenesis",
-            "molecular"
+            "molecular",
+            "genetic",
+            "mutation",
+            "oncogene",
+            "tumor suppressor"
+        ],
+        "clinical_trials": [
+            "clinical trial",
+            "phase i",
+            "phase ii",
+            "phase iii",
+            "study results",
+            "trial"
         ]
     }
 
-    for section, kws in sections.items():
+    scores = {}
 
-        for kw in kws:
-
+    for section, keywords in sections.items():
+        score = 0
+        for kw in keywords:
             if kw in text_lower:
-                return section
+                score += 1
+        if score > 0:
+            scores[section] = score
 
-    return "general"
+    if scores:
+        ordered = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+        return {
+            "primary": ordered[0],
+            "secondary": ordered[1:3]
+        }
+
+    return {
+        "primary": "general",
+        "secondary": []
+    }
 
 
-# =========================================================
-# 🔹 QUALITY FILTER
-# =========================================================
 # =========================================================
 # 🔹 QUALITY FILTER
 # =========================================================
 def is_good_chunk(text):
 
     text_lower = text.lower()
-
     words = text.split()
 
-    # =====================================================
-    # 🔹 TOO SHORT
-    # =====================================================
     if len(words) < 40:
         return False
 
-    # =====================================================
-    # 🔹 TOO LONG
-    # =====================================================
     if len(words) > 700:
         return False
 
-    # =====================================================
-    # 🔹 HARD GARBAGE FILTERS
-    # =====================================================
     bad_patterns = [
-
         "table of contents",
-
         "copyright",
-
         "all rights reserved",
-
         "isbn",
-
         "doi.org",
-
         "www.",
-
         "http://",
-
         "https://"
     ]
 
     for p in bad_patterns:
-
         if p in text_lower:
             return False
 
-    # =====================================================
-    # 🔹 CHARACTER QUALITY
-    # =====================================================
-    alpha_ratio = sum(
-
-        c.isalpha()
-
-        for c in text
-    ) / max(len(text), 1)
-
-    # Too much OCR junk
+    alpha_ratio = sum(c.isalpha() for c in text) / max(len(text), 1)
     if alpha_ratio < 0.55:
         return False
 
-    # =====================================================
-    # 🔹 MEDICAL TERM BOOST
-    # =====================================================
-    medical_terms = [
-
-        "cancer",
-        "tumor",
-        "tumour",
-        "therapy",
-        "treatment",
-        "diagnosis",
-        "metastasis",
-        "oncology",
-        "patient",
-        "survival",
-        "immune",
-        "clinical",
-        "carcinoma",
-        "chemotherapy",
-        "radiotherapy",
-        "biopsy",
-        "immunotherapy"
-    ]
-
-    if any(
-        term in text_lower
-        for term in medical_terms
-    ):
-        return True
-
-    # =====================================================
-    # 🔹 OTHERWISE KEEP
-    # =====================================================
     return True
 
 
@@ -291,179 +259,58 @@ def is_good_chunk(text):
 # =========================================================
 def split_sentences(text):
 
-    text = re.sub(
-        r"([a-z])([A-Z])",
-        r"\1. \2",
-        text
-    )
-
-    sentences = re.split(
-        r'(?<=[.!?])\s+',
-        text
-    )
+    text = re.sub(r"([a-z])([A-Z])", r"\1. \2", text)
+    sentences = re.split(r"(?<=[.!?])\s+", text)
 
     cleaned = []
-
     for s in sentences:
-
         s = s.strip()
-
         if len(s) > 20:
             cleaned.append(s)
 
     return cleaned
 
+
 # =========================================================
 # 🔹 SEMANTIC CHUNKER (OPTIMIZED)
 # =========================================================
-def fallback_chunk(
-    text,
-    max_chunk_words=320,
-    overlap_sentences=2
-):
+def fallback_chunk(text, max_chunk_words=320, overlap_sentences=2):
 
     print("🧩 Creating semantic chunks...")
 
     sentences = split_sentences(text)
-
     chunks = []
-
     current = []
-
     current_words = 0
 
     for sent in sentences:
+        sent_words = len(sent.split())
 
-        sent_words = len(
-            sent.split()
-        )
-
-        # =====================================================
-        # 🔹 SKIP VERY SHORT SENTENCES
-        # =====================================================
         if sent_words < 5:
             continue
 
-        # =====================================================
-        # 🔹 CREATE CHUNK
-        # =====================================================
-        if (
-            current_words + sent_words
-            > max_chunk_words
-        ):
+        if current_words + sent_words > max_chunk_words:
 
             chunk = " ".join(current)
 
             if chunk.strip():
-
                 chunks.append(chunk)
 
-            # =================================================
-            # 🔹 SMART OVERLAP
-            # =================================================
-            overlap = current[
-                -overlap_sentences:
-            ]
-
+            overlap = current[-overlap_sentences:]
             current = overlap + [sent]
-
-            current_words = sum(
-
-                len(s.split())
-
-                for s in current
-            )
+            current_words = sum(len(s.split()) for s in current)
 
         else:
-
             current.append(sent)
-
             current_words += sent_words
 
-    # =========================================================
-    # 🔹 LAST CHUNK
-    # =========================================================
     if current:
+        chunks.append(" ".join(current))
 
-        chunks.append(
-            " ".join(current)
-        )
-
-    print(
-        f"✅ Semantic chunks created: "
-        f"{len(chunks)}"
-    )
-
+    print(f"✅ Semantic chunks created: {len(chunks)}")
     return chunks
-# =========================================================
-# =========================================================
-# 🔹 AGENTIC ENRICHMENT
-# =========================================================
-# =========================================================
-# 🔹 DOCUMENT-LEVEL AGENTIC ENRICHMENT
-# =========================================================
-def llm_chunk(text):
 
-    print("🤖 Generating document metadata...")
 
-    short_text = text[:4000]
-
-    prompt = f"""
-Analyze this oncology medical document.
-
-Return ONLY JSON.
-
-FORMAT:
-{{
-  "document_type": "...",
-  "main_topics": ["...", "..."],
-  "cancer_types": ["...", "..."],
-  "summary": "..."
-}}
-
-TEXT:
-{short_text}
-"""
-
-    try:
-
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-
-                    "temperature": 0,
-
-                    "top_p": 0.1,
-
-                    "num_predict": 180,
-
-                    "keep_alive": "10m"
-                }
-            },
-            timeout=40
-        )
-
-        raw = response.json().get(
-            "response",
-            ""
-        )
-
-        print("✅ Metadata generated")
-
-        return raw
-
-    except Exception as e:
-
-        print(
-            "⚠️ Metadata generation failed:",
-            e
-        )
-
-        return ""
 # =========================================================
 # 🔹 FAST DEDUPLICATION
 # =========================================================
@@ -472,75 +319,40 @@ def deduplicate_chunks(chunks):
     print("🔹 Deduplicating chunks...")
 
     unique = []
-
     seen_hashes = set()
 
     for chunk in chunks:
-
         text = chunk["text"]
-
-        key = hash(
-            text[:300].lower()
-        )
+        key = hash(text[:300].lower())
 
         if key in seen_hashes:
             continue
 
         seen_hashes.add(key)
-
         unique.append(chunk)
 
-    print(
-        f"✅ Chunks after deduplication: "
-        f"{len(unique)}"
-    )
-
+    print(f"✅ Chunks after deduplication: {len(unique)}")
     return unique
 
 
 # =========================================================
 # 🔹 MAIN PIPELINE
 # =========================================================
-# =========================================================
-# 🔹 MAIN PIPELINE
-# =========================================================
-# =========================================================
-# 🔹 MAIN PIPELINE
-# =========================================================
 def chunk_text(documents):
 
     final_chunks = []
-
     chunk_counter = 0
+    total_chunks = 0
 
     for i, doc in enumerate(documents):
 
         file_id = doc["id"]
+        text = clean_text(doc["text"])
 
-        text = clean_text(
-            doc["text"]
-        )
+        print(f"\n📄 Processing {i+1}/{len(documents)}: {file_id}")
 
-        print(
-            f"\n📄 Processing "
-            f"{i+1}/{len(documents)}: "
-            f"{file_id}"
-        )
-
-        # =====================================================
-        # 🔹 STEP 1: SEMANTIC CHUNKING
-        # =====================================================
         chunks = fallback_chunk(text)
-
-        # =====================================================
-        # 🔹 STEP 2: DOCUMENT METADATA
-        # =====================================================
-        metadata = llm_chunk(text)
-
-        print(
-            f"📦 Candidate chunks: "
-            f"{len(chunks)}"
-        )
+        print(f"📦 Candidate chunks: {len(chunks)}")
 
         kept = 0
 
@@ -551,52 +363,51 @@ def chunk_text(documents):
             if not is_good_chunk(c):
                 continue
 
-            section = detect_section(c)
+            section_info = detect_section(c)
+            primary_section = section_info["primary"]
+            secondary_sections = section_info["secondary"]
+
+            total_chunks += 1
+
+            chunk_metadata = classify_chunk_metadata(
+                c,
+                section=primary_section,
+                source_document=file_id
+            )
 
             final_chunks.append({
-
                 "id": f"doc_{chunk_counter}",
-
                 "text": c,
-
                 "doc_id": file_id,
-
-                "section": section,
-
-                "metadata": metadata,
-
-                "length": len(
-                    c.split()
-                )
+                "source_document": file_id,
+                "section": primary_section,
+                "metadata": chunk_metadata,
+                "category": chunk_metadata.get("category", primary_section),
+                "sub_category": chunk_metadata.get("sub_category", primary_section),
+                "categories": [primary_section] + secondary_sections,
+                "keywords": chunk_metadata.get("keywords", []),
+                "cancer_type": chunk_metadata.get("cancer_type", "general"),
+                "treatment_type": chunk_metadata.get("treatment_type", "general"),
+                "length": len(c.split())
             })
 
             chunk_counter += 1
-
             kept += 1
 
-        print(
-            f"✅ Valid chunks kept: "
-            f"{kept}"
-        )
+        print(f"✅ Valid chunks kept: {kept}")
 
-    # =========================================================
-    # 🔹 DEDUPLICATION
-    # =========================================================
-    final_chunks = deduplicate_chunks(
-        final_chunks
-    )
+    final_chunks = deduplicate_chunks(final_chunks)
 
     print("\n🔍 SAMPLE CHUNKS:\n")
-
     for c in final_chunks[:3]:
-
         print(c)
-
         print()
 
-    print(
-        f"\n✅ Total cleaned chunks: "
-        f"{len(final_chunks)}"
-    )
+    print(f"Chunks processed: {total_chunks}")
+    print(f"Heuristic metadata generated: {total_chunks}")
+    print("LLM metadata calls: 0")
+    print("LLM usage rate: 0.00%")
+
+    print(f"\n✅ Total cleaned chunks: {len(final_chunks)}")
 
     return final_chunks

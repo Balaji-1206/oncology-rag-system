@@ -595,7 +595,13 @@ def agent_decision(query_input):
             "reranker_confidence"
         ] = reranker_confidence
 
-        print("EVAL:", eval_result)
+        eval_result[
+            "retrieval_diagnostics"
+        ] = retrieval_result.get(
+            "retrieval_diagnostics",
+            []
+        )
+
 
         # =====================================================
         # 🔹 MEMORY

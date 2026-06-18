@@ -772,8 +772,8 @@ def generate_answer(agent_output):
             "response",
             ""
         )
-
-        print("\n🧠 RAW GENERATOR OUTPUT:\n")
+        
+        print("\n🧠 RAW GENERATER ANSWER:")
         print(raw_answer)
 
         answer = clean_output(
