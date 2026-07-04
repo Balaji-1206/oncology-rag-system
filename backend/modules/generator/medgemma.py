@@ -414,6 +414,8 @@ def clean_output(answer):
 
         r"(?s)Reasoning:.*",
 
+        r"(?s)thought.*",
+
         r"(?s)Observation:.*",
 
         r"(?s)Constraint Checklist.*",
@@ -639,7 +641,7 @@ MEDICAL CONTEXT:
 QUESTION:
 {query}
 
-FINAL ANSWER:
+Provide only the final answer:
 """
 
     return prompt
@@ -666,7 +668,7 @@ def build_generation_options(query_type="general"):
 
     return {
 
-        "temperature": 0.08,
+        "temperature": 0,
 
         "top_p": 0.82,
 
@@ -676,7 +678,7 @@ def build_generation_options(query_type="general"):
 
         "num_predict": num_predict,
 
-        "num_ctx": 3072,
+        "num_ctx": 2048,
 
         "num_thread": 8,
 
@@ -706,11 +708,7 @@ def build_generation_options(query_type="general"):
 
             "The user wants",
 
-            "QUESTION:",
-
-            "MEDICAL CONTEXT:",
-
-            "FINAL ANSWER:"
+            "MEDICAL CONTEXT:"
         ]
     }
 
