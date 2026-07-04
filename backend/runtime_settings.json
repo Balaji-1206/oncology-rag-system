@@ -1,5 +1,5 @@
 {
-  "enable_laqa": true,
+  "enable_laqa": false,
   "enable_mrl": true,
   "full_embedding_dimension": 256,
   "mrl_dimension": 512,

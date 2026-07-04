@@ -8,6 +8,7 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from nltk.translate.gleu_score import sentence_gleu
 from rouge_score import rouge_scorer
 from bert_score import score as bert_score
+from transformers import AutoTokenizer, AutoModel
 from sentence_transformers import util
 from nltk.translate.meteor_score import meteor_score
 from nltk.tokenize import word_tokenize

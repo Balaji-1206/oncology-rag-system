@@ -1,0 +1,405 @@
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Agentic Oncology RAG
+Experiment 1: LAQA + MRL
+LAQA enabled        : True
+MRL enabled         : True
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.82
+Avg agent iters    : 1.00
+Avg rerank score   : 0.79
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.63
+Recall@5           : 0.90
+MRR                : 0.80
+NDCG@5             : 0.89
+Hit-Rate@5         : 0.93
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.28
+BLEU-2             : 0.18
+BLEU-4             : 0.09
+GLEU               : 0.13
+METEOR             : 0.39
+Accuracy           : 0.00
+F1                 : 0.46
+ROUGE-1            : 0.43
+ROUGE-2            : 0.24
+ROUGE-L            : 0.39
+ROUGE-Lsum         : 0.40
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.89
+SBERT similarity   : 0.84
+DISTINCT-1         : 0.84
+DISTINCT-2         : 0.96
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.88
+Context Relevancy  : 0.83
+Answer relevancy   : 0.89
+Grounding Score    : 0.79
+Retrieval Score    : 0.86
+Hallucination Safe : 0.98
+Grounded Answers   : 0.98
+Safe Refusal Rate  : 0.03
+Answer Quality     : 8.70
+LLM Judge Score    : 0.86
+
+==========================================================
+Hallucination Statistics
+==========================================================
+
+Hallucination Safe : 98.00%
+Hallucination Rate : 2.00%
+
+==========================================================
+Latency Statistics
+==========================================================
+
+Retrieval Latency
+----------------------------------------------------
+Mean               : 27.80
+Median             : 27.10
+Min                : 18.90
+Max                : 39.60
+Std                : 4.30
+P50                : 27.10
+P90                : 34.80
+P95                : 36.50
+P99                : 38.90
+95% CI             : 27.80 ± 0.60 (27.20, 28.40)
+
+Agent Communication Latency
+----------------------------------------------------
+Mean               : 21.40
+Median             : 21.10
+Min                : 16.70
+Max                : 30.10
+Std                : 2.90
+P50                : 21.10
+P90                : 25.80
+P95                : 27.10
+P99                : 29.20
+95% CI             : 21.40 ± 0.40 (21.00, 21.80)
+
+Total Response Time
+----------------------------------------------------
+Mean               : 49.20
+Median             : 48.80
+Min                : 37.40
+Max                : 65.70
+Std                : 5.90
+P50                : 48.80
+P90                : 57.90
+P95                : 60.30
+P99                : 63.80
+95% CI             : 49.20 ± 0.82 (48.38, 50.02)
+
+
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Agentic Oncology RAG
+Experiment 2: Without LAQA
+LAQA enabled        : False
+MRL enabled         : True
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.77
+Avg agent iters    : 1.00
+Avg rerank score   : 0.75
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.56
+Recall@5           : 0.84
+MRR                : 0.73
+NDCG@5             : 0.84
+Hit-Rate@5         : 0.88
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.25
+BLEU-2             : 0.16
+BLEU-4             : 0.08
+GLEU               : 0.11
+METEOR             : 0.36
+Accuracy           : 0.00
+F1                 : 0.42
+ROUGE-1            : 0.39
+ROUGE-2            : 0.21
+ROUGE-L            : 0.35
+ROUGE-Lsum         : 0.36
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.87
+SBERT similarity   : 0.81
+DISTINCT-1         : 0.83
+DISTINCT-2         : 0.95
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.82
+Context Relevancy  : 0.77
+Answer relevancy   : 0.84
+Grounding Score    : 0.71
+Retrieval Score    : 0.79
+Hallucination Safe : 0.97
+Grounded Answers   : 0.97
+Safe Refusal Rate  : 0.04
+Answer Quality     : 7.90
+LLM Judge Score    : 0.79
+
+==========================================================
+Hallucination Statistics
+==========================================================
+
+Hallucination Safe : 97.00%
+Hallucination Rate : 3.00%
+
+==========================================================
+Latency Statistics
+==========================================================
+
+Retrieval Latency
+----------------------------------------------------
+Mean               : 24.60
+Median             : 24.20
+Min                : 17.10
+Max                : 35.80
+Std                : 3.90
+P50                : 24.20
+P90                : 30.90
+P95                : 32.40
+P99                : 34.60
+95% CI             : 24.60 ± 0.54 (24.06, 25.14)
+
+Agent Communication Latency
+----------------------------------------------------
+Mean               : 21.00
+Median             : 20.80
+Min                : 16.20
+Max                : 28.90
+Std                : 2.70
+P50                : 20.80
+P90                : 25.30
+P95                : 26.70
+P99                : 28.10
+95% CI             : 21.00 ± 0.38 (20.62, 21.38)
+
+Total Response Time
+----------------------------------------------------
+Mean               : 45.60
+Median             : 45.10
+Min                : 35.90
+Max                : 61.70
+Std                : 5.30
+P50                : 45.10
+P90                : 53.60
+P95                : 56.10
+P99                : 59.90
+95% CI             : 45.60 ± 0.74 (44.86, 46.34)
+
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Agentic Oncology RAG
+Experiment 3: Without MRL
+LAQA enabled        : True
+MRL enabled         : False
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.73
+Avg agent iters    : 1.00
+Avg rerank score   : 0.71
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.50
+Recall@5           : 0.77
+MRR                : 0.67
+NDCG@5             : 0.79
+Hit-Rate@5         : 0.82
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.22
+BLEU-2             : 0.14
+BLEU-4             : 0.07
+GLEU               : 0.10
+METEOR             : 0.34
+Accuracy           : 0.00
+F1                 : 0.39
+ROUGE-1            : 0.36
+ROUGE-2            : 0.19
+ROUGE-L            : 0.32
+ROUGE-Lsum         : 0.33
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.86
+SBERT similarity   : 0.79
+DISTINCT-1         : 0.82
+DISTINCT-2         : 0.94
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.79
+Context Relevancy  : 0.73
+Answer relevancy   : 0.81
+Grounding Score    : 0.67
+Retrieval Score    : 0.73
+Hallucination Safe : 0.96
+Grounded Answers   : 0.96
+Safe Refusal Rate  : 0.05
+Answer Quality     : 7.40
+LLM Judge Score    : 0.74
+
+==========================================================
+Hallucination Statistics
+==========================================================
+
+Hallucination Safe : 96.00%
+Hallucination Rate : 4.00%
+
+==========================================================
+Latency Statistics
+==========================================================
+
+Retrieval Latency
+----------------------------------------------------
+Mean               : 22.90
+Median             : 22.50
+Min                : 16.20
+Max                : 33.70
+Std                : 3.50
+P50                : 22.50
+P90                : 28.60
+P95                : 30.20
+P99                : 32.80
+95% CI             : 22.90 ± 0.48 (22.42, 23.38)
+
+Agent Communication Latency
+----------------------------------------------------
+Mean               : 20.90
+Median             : 20.60
+Min                : 15.90
+Max                : 28.40
+Std                : 2.60
+P50                : 20.60
+P90                : 24.90
+P95                : 26.20
+P99                : 27.80
+95% CI             : 20.90 ± 0.36 (20.54, 21.26)
+
+Total Response Time
+----------------------------------------------------
+Mean               : 43.80
+Median             : 43.30
+Min                : 34.10
+Max                : 58.90
+Std                : 5.00
+P50                : 43.30
+P90                : 51.60
+P95                : 53.90
+P99                : 57.40
+95% CI             : 43.80 ± 0.70 (43.10, 44.50)
+
+
+================================================================================
+ONCOLOGY RAG - COMPLETE EVALUATION REPORT
+Agentic Oncology RAG
+Experiment 4: Without LAQA and MRL
+LAQA enabled        : False
+MRL enabled         : False
+================================================================================
+
+Questions evaluated : 200
+Avg confidence     : 0.67
+Avg agent iters    : 1.00
+Avg rerank score   : 0.66
+
+-- Retrieval Quality (k=5) ---------------------------------------------
+Precision@5        : 0.43
+Recall@5           : 0.69
+MRR                : 0.58
+NDCG@5             : 0.71
+Hit-Rate@5         : 0.74
+
+-- Generation Lexical -----------------------------------------------
+BLEU-1             : 0.19
+BLEU-2             : 0.12
+BLEU-4             : 0.05
+GLEU               : 0.08
+METEOR             : 0.30
+Accuracy           : 0.00
+F1                 : 0.34
+ROUGE-1            : 0.31
+ROUGE-2            : 0.16
+ROUGE-L            : 0.28
+ROUGE-Lsum         : 0.29
+
+-- Generation Semantic ----------------------------------------------
+BERTScore F1       : 0.85
+SBERT similarity   : 0.74
+DISTINCT-1         : 0.80
+DISTINCT-2         : 0.92
+
+-- Faithfulness & Safety -----------------------------------------
+Faithfulness       : 0.73
+Context Relevancy  : 0.68
+Answer relevancy   : 0.76
+Grounding Score    : 0.60
+Retrieval Score    : 0.66
+Hallucination Safe : 0.94
+Grounded Answers   : 0.94
+Safe Refusal Rate  : 0.06
+Answer Quality     : 6.70
+LLM Judge Score    : 0.68
+
+==========================================================
+Hallucination Statistics
+==========================================================
+
+Hallucination Safe : 94.00%
+Hallucination Rate : 6.00%
+
+==========================================================
+Latency Statistics
+==========================================================
+
+Retrieval Latency
+----------------------------------------------------
+Mean               : 19.80
+Median             : 19.40
+Min                : 14.60
+Max                : 28.50
+Std                : 3.00
+P50                : 19.40
+P90                : 24.70
+P95                : 26.10
+P99                : 27.80
+95% CI             : 19.80 ± 0.42 (19.38, 20.22)
+
+Agent Communication Latency
+----------------------------------------------------
+Mean               : 20.50
+Median             : 20.20
+Min                : 15.70
+Max                : 27.60
+Std                : 2.50
+P50                : 20.20
+P90                : 24.30
+P95                : 25.70
+P99                : 27.10
+95% CI             : 20.50 ± 0.35 (20.15, 20.85)
+
+Total Response Time
+----------------------------------------------------
+Mean               : 40.30
+Median             : 39.90
+Min                : 31.60
+Max                : 54.90
+Std                : 4.60
+P50                : 39.90
+P90                : 47.80
+P95                : 50.20
+P99                : 53.30
+95% CI             : 40.30 ± 0.64 (39.66, 40.94)

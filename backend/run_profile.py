@@ -48,8 +48,7 @@ from metrics import (
 
 questions = [
     "What are the common side effects of chemotherapy?"
-    "In lung cancer staging, what is the significance of a mediastinal lymph node measuring 1.5 cm on a CT scan?",
-    "What percentage of patients with Small Cell Lung Cancer (SCLC) have neurologically asymptomatic brain metastases?"
+    "In lung cancer staging, what is the significance of a mediastinal lymph node measuring 1.5 cm on a CT scan?"
 ]
 
 # =========================================================

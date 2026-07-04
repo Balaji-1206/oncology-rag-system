@@ -1,13 +1,22 @@
-import json
-import numpy as np
-import io
+import argparse
 import contextlib
+import io
+import json
+import math
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+import numpy as np
+from scipy import stats
 
 from tqdm import tqdm
 
 import settings
+import app as app_module
 from app import handle_query
+from modules.agent import agent_controller as agent_controller_module
 
 from metrics import *
 
@@ -94,6 +103,539 @@ def refusal_detected(answer):
 
 
 # =========================================================
+# 🔹 GENERIC HELPERS
+# =========================================================
+def _coerce_float(value):
+
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return float(value)
+
+    if isinstance(value, (int, float, np.number)):
+        if math.isfinite(float(value)):
+            return float(value)
+        return None
+
+    if isinstance(value, str):
+        text = value.strip().replace(",", "")
+
+        if text.endswith("%"):
+            text = text[:-1].strip()
+
+        try:
+            parsed = float(text)
+        except ValueError:
+            return None
+
+        if math.isfinite(parsed):
+            return parsed
+
+    return None
+
+
+def _coerce_bool(value):
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (int, float, np.number)):
+        return bool(value)
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+
+        if normalized in {"false", "0", "no", "n", "none", "null"}:
+            return False
+
+    return None
+
+
+def _load_json_payload(path):
+
+    with open(path, "r", encoding="utf-8") as handle:
+
+        try:
+            return json.load(handle)
+        except json.JSONDecodeError:
+            handle.seek(0)
+            records = []
+
+            for line in handle:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                records.append(json.loads(line))
+
+            return records
+
+
+def _normalize_records(payload):
+
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+
+    if isinstance(payload, dict):
+
+        for key in ("results", "records", "question_records", "data"):
+            value = payload.get(key)
+
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+
+        return [payload]
+
+    return []
+
+
+def load_records_from_path(path):
+
+    return _normalize_records(
+        _load_json_payload(path)
+    )
+
+
+def _results_directory():
+
+    return os.path.join(
+        os.path.dirname(__file__),
+        "results"
+    )
+
+
+def _experiment_result_filename():
+
+    laqa_state = "on" if settings.is_laqa_enabled() else "off"
+    mrl_state = "on" if settings.is_mrl_enabled() else "off"
+
+    return f"laqa_{laqa_state}_mrl_{mrl_state}.json"
+
+
+def _serialize_experiment_record(record):
+
+    return {
+        "question_id": record.get("question_id", 0),
+        "precision_at_5": record.get("precision", 0),
+        "recall_at_5": record.get("recall", 0),
+        "mrr": record.get("mrr", 0),
+        "ndcg_at_5": record.get("ndcg", 0),
+        "hit_rate": record.get("hit_rate", 0),
+        "bleu4": record.get("bleu4", 0),
+        "rougeL": record.get("rougeL", 0),
+        "meteor": record.get("meteor", 0),
+        "bertscore": record.get("bertscore", 0),
+        "sbert_similarity": record.get("sbert_similarity", 0),
+        "faithfulness": record.get("faithfulness", 0),
+        "grounding_score": record.get("grounding_score", 0),
+        "answer_relevancy": record.get("answer_rel", 0),
+        "context_relevancy": record.get("context_rel", 0),
+        "hallucinated": record.get("hallucinated", 0),
+        "retrieval_latency": record.get("retrieval_latency", 0),
+        "agent_latency": record.get("agent_communication_latency", 0),
+        "total_latency": record.get("total_response_time", 0),
+    }
+
+
+def _save_experiment_results(results):
+
+    output_dir = _results_directory()
+    os.makedirs(output_dir, exist_ok=True)
+
+    output_path = os.path.join(
+        output_dir,
+        _experiment_result_filename()
+    )
+
+    with open(
+        output_path,
+        "w",
+        encoding="utf-8"
+    ) as handle:
+
+        json.dump(
+            [
+                _serialize_experiment_record(record)
+                for record in results
+            ],
+            handle,
+            indent=2,
+            ensure_ascii=False
+        )
+
+    return output_path
+
+
+def _first_numeric(source, keys):
+
+    if not isinstance(source, dict):
+        return None
+
+    for key in keys:
+
+        if key in source:
+            value = _coerce_float(source.get(key))
+
+            if value is not None:
+                return value
+
+    for nested_key in ("metrics", "profile", "latency", "latencies", "timings", "performance"):
+
+        nested = source.get(nested_key)
+
+        if isinstance(nested, dict):
+            value = _first_numeric(nested, keys)
+
+            if value is not None:
+                return value
+
+    return None
+
+
+LATENCY_FIELD_ALIASES = {
+    "retrieval_latency": (
+        "retrieval_latency",
+        "retrieval_time",
+        "retrieval_ms",
+        "retrieval_latency_ms",
+        "rag_retrieval_latency",
+        "search_latency",
+    ),
+    "agent_communication_latency": (
+        "agent_communication_latency",
+        "agent_comm_latency",
+        "communication_latency",
+        "agent_latency",
+        "comm_latency",
+    ),
+    "total_response_time": (
+        "total_response_time",
+        "total_time",
+        "response_time",
+        "elapsed_time",
+        "latency",
+    ),
+}
+
+
+def extract_latency_snapshot(record, metrics=None):
+
+    merged = {}
+
+    if isinstance(metrics, dict):
+        merged.update(metrics)
+
+    if isinstance(record, dict):
+        merged.update(record)
+
+    retrieval_latency = _first_numeric(
+        merged,
+        (
+            "retrieval_latency",
+            "retrieval_time",
+            "retrieval_ms",
+            "retrieval_latency_ms",
+            "rag_retrieval_latency",
+            "search_latency",
+        )
+    )
+
+    agent_latency = _first_numeric(
+        merged,
+        (
+            "agent_communication_latency",
+            "agent_comm_latency",
+            "communication_latency",
+            "agent_latency",
+            "comm_latency",
+        )
+    )
+
+    total_response_time = _first_numeric(
+        merged,
+        (
+            "total_response_time",
+            "response_time",
+            "total_time",
+            "elapsed_time",
+            "latency",
+        )
+    )
+
+    return {
+        "retrieval_latency": retrieval_latency,
+        "agent_communication_latency": agent_latency,
+        "total_response_time": total_response_time,
+    }
+
+
+def _numeric_series(results, key):
+
+    series = []
+
+    for item in results:
+
+        if not isinstance(item, dict):
+            continue
+
+        value = _first_numeric(
+            item,
+            LATENCY_FIELD_ALIASES.get(
+                key,
+                (key,)
+            )
+        )
+
+        if value is None:
+            continue
+
+        series.append(value)
+
+    return series
+
+
+def _summarize_series(values):
+
+    clean_values = [
+        float(value)
+        for value in values
+        if value is not None and math.isfinite(float(value))
+    ]
+
+    if not clean_values:
+        return None
+
+    arr = np.asarray(clean_values, dtype=float)
+    mean_value = float(np.mean(arr))
+    median_value = float(np.median(arr))
+    min_value = float(np.min(arr))
+    max_value = float(np.max(arr))
+    std_value = float(np.std(arr, ddof=1)) if arr.size > 1 else 0.0
+    p50 = float(np.percentile(arr, 50))
+    p90 = float(np.percentile(arr, 90))
+    p95 = float(np.percentile(arr, 95))
+    p99 = float(np.percentile(arr, 99))
+
+    if arr.size > 1:
+        sem = stats.sem(arr, nan_policy="omit")
+
+        if sem is not None and math.isfinite(float(sem)):
+            critical = float(stats.t.ppf(0.975, df=arr.size - 1))
+            margin = critical * float(sem)
+            ci_low = mean_value - margin
+            ci_high = mean_value + margin
+        else:
+            ci_low = mean_value
+            ci_high = mean_value
+    else:
+        ci_low = mean_value
+        ci_high = mean_value
+
+    return {
+        "count": int(arr.size),
+        "mean": mean_value,
+        "median": median_value,
+        "min": min_value,
+        "max": max_value,
+        "std": std_value,
+        "p50": p50,
+        "p90": p90,
+        "p95": p95,
+        "p99": p99,
+        "ci_low": float(ci_low),
+        "ci_high": float(ci_high),
+        "ci_half_width": float(abs(ci_high - mean_value)),
+    }
+
+
+def _is_hallucinated(record):
+
+    if not isinstance(record, dict):
+        return False
+
+    if "hallucinated" in record:
+        value = _coerce_bool(record.get("hallucinated"))
+
+        if value is not None:
+            return value
+
+    for key in ("hallucination_risk", "hallucination_state", "risk"):
+        value = record.get(key)
+
+        if value is None:
+            continue
+
+        value_text = str(value).strip().lower()
+
+        if value_text in {"high", "hallucinated", "unsafe", "yes", "true", "1"}:
+            return True
+
+        if value_text in {"low", "safe", "false", "0", "no"}:
+            return False
+
+    if "hallucination_low" in record:
+        safe_value = _coerce_bool(record.get("hallucination_low"))
+
+        if safe_value is not None:
+            return not safe_value
+
+    return False
+
+
+def hallucination_rate(results):
+
+    total_questions = len(results)
+
+    if total_questions == 0:
+        return 0.0
+
+    hallucinated = sum(
+        1 for record in results
+        if _is_hallucinated(record)
+    )
+
+    return (hallucinated / total_questions) * 100.0
+
+
+def build_latency_stats(results, field_name):
+
+    return _summarize_series(
+        _numeric_series(results, field_name)
+    )
+
+
+def _run_query_with_latency_measurements(user_query):
+
+    total_start = time.perf_counter()
+    retrieval_latency = 0.0
+    agent_latency = 0.0
+
+    original_handle_agent_decision = app_module.agent_decision
+    original_hybrid_search = agent_controller_module.hybrid_search
+
+    def timed_agent_decision(*args, **kwargs):
+
+        nonlocal agent_latency
+
+        agent_start = time.perf_counter()
+
+        try:
+            return original_handle_agent_decision(*args, **kwargs)
+        finally:
+            agent_latency += time.perf_counter() - agent_start
+
+    def timed_hybrid_search(*args, **kwargs):
+
+        nonlocal retrieval_latency
+
+        retrieval_start = time.perf_counter()
+
+        try:
+            return original_hybrid_search(*args, **kwargs)
+        finally:
+            retrieval_latency += time.perf_counter() - retrieval_start
+
+    app_module.agent_decision = timed_agent_decision
+    agent_controller_module.hybrid_search = timed_hybrid_search
+
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = handle_query(user_query)
+    finally:
+        app_module.agent_decision = original_handle_agent_decision
+        agent_controller_module.hybrid_search = original_hybrid_search
+
+    total_response_time = time.perf_counter() - total_start
+
+    agent_communication_latency = max(
+        0.0,
+        agent_latency - retrieval_latency
+    )
+
+    return result, {
+        "retrieval_latency": retrieval_latency,
+        "agent_communication_latency": agent_communication_latency,
+        "total_response_time": total_response_time,
+    }
+
+
+def _format_number(value, digits=4):
+
+    if value is None:
+        return "N/A"
+
+    if isinstance(value, float) and not math.isfinite(value):
+        return "N/A"
+
+    return f"{value:.{digits}f}"
+
+
+def _print_latency_block(title, stats_dict):
+
+    print(
+        f"\n{title}"
+    )
+
+    print(
+        "-" * 52
+    )
+
+    if not stats_dict:
+
+        print(
+            "No latency data available."
+        )
+
+        return
+
+    print(
+        f"Mean               : {_format_number(stats_dict['mean'])}"
+    )
+
+    print(
+        f"Median             : {_format_number(stats_dict['median'])}"
+    )
+
+    print(
+        f"Min                : {_format_number(stats_dict['min'])}"
+    )
+
+    print(
+        f"Max                : {_format_number(stats_dict['max'])}"
+    )
+
+    print(
+        f"Std                : {_format_number(stats_dict['std'])}"
+    )
+
+    print(
+        f"P50                : {_format_number(stats_dict['p50'])}"
+    )
+
+    print(
+        f"P90                : {_format_number(stats_dict['p90'])}"
+    )
+
+    print(
+        f"P95                : {_format_number(stats_dict['p95'])}"
+    )
+
+    print(
+        f"P99                : {_format_number(stats_dict['p99'])}"
+    )
+
+    print(
+        f"95% CI             : {_format_number(stats_dict['mean'])} ± {_format_number(stats_dict['ci_half_width'])}"
+        f" ({_format_number(stats_dict['ci_low'])}, {_format_number(stats_dict['ci_high'])})"
+    )
+
+
+# =========================================================
 # 🔹 MAIN EVALUATION
 # =========================================================
 def evaluate(dataset_path):
@@ -111,12 +653,12 @@ def evaluate(dataset_path):
     print("\n🚀 Running Evaluation...\n")
 
     total_questions = min(
-        200,
+        2,
         len(data)
     )
 
     progress_bar = tqdm(
-        data[:200],
+        data[:2],
         desc="🧪 Evaluating",
         ncols=120
     )
@@ -156,11 +698,9 @@ def evaluate(dataset_path):
         # =====================================================
         # 🔹 PIPELINE
         # =====================================================
-        with contextlib.redirect_stdout(
-            io.StringIO()
-        ):
-
-            result = handle_query(q)
+        result, latency_snapshot = _run_query_with_latency_measurements(
+            q
+        )
 
         pred = result.get(
             "answer",
@@ -215,6 +755,11 @@ def evaluate(dataset_path):
         print(
             "CONTEXT RELEVANCY DOC COUNT:",
             len(context_docs)
+        )
+
+        question_bertscore = compute_bertscore(
+            [gt],
+            [pred]
         )
 
         with ThreadPoolExecutor(
@@ -435,6 +980,20 @@ def evaluate(dataset_path):
                 ) == "low"
             ),
 
+            "hallucination_risk": evaluation.get(
+                "hallucination_risk",
+                "medium"
+            ),
+
+            "hallucinated": int(
+                str(
+                    evaluation.get(
+                        "hallucination_risk",
+                        "medium"
+                    )
+                ).lower() == "high"
+            ),
+
             "safe_refusal": int(
                 refusal_detected(pred)
             ),
@@ -489,13 +1048,40 @@ def evaluate(dataset_path):
 
             **retrieval,
 
-            **medical_metrics
+            **medical_metrics,
+
+            **latency_snapshot
         }
 
         res["retrieval_diagnostics"] = evaluation.get(
             "retrieval_diagnostics",
             []
         )
+
+        res["question_id"] = idx
+        res["question"] = q
+        res["ground_truth_answer"] = gt
+        res["generated_answer"] = pred
+        res["hallucination_safe"] = res.get(
+            "hallucination_low",
+            0
+        )
+        res["context_relevancy"] = context_rel
+        res["answer_relevancy"] = answer_rel
+        res["retrieval_precision"] = retrieval.get(
+            "precision",
+            0
+        )
+        res["precision_at_5"] = retrieval.get(
+            "precision",
+            0
+        )
+        res["question_metadata"] = item.get(
+            "query_metadata",
+            {}
+        )
+        res["metrics"] = evaluation
+        res["bertscore"] = question_bertscore
 
         results.append(res)
 
@@ -536,6 +1122,10 @@ def evaluate(dataset_path):
     bert = compute_bertscore(
         references,
         predictions
+    )
+
+    _save_experiment_results(
+        results
     )
 
     return results, bert
@@ -828,18 +1418,79 @@ def print_report(results, bert):
 
     print("=" * 80)
 
+    # =====================================================
+    # 🔹 HALLUCINATION STATISTICS
+    # =====================================================
+    print(
+        "\n=========================================================="
+    )
+
+    print(
+        "Hallucination Statistics"
+    )
+
+    print(
+        "=========================================================="
+    )
+
+    print(
+        f"Hallucination Safe : {avg(results,'hallucination_low'):.4f}"
+    )
+
+    print(
+        f"Hallucination Rate : {hallucination_rate(results):.2f}%"
+    )
+
+    # =====================================================
+    # 🔹 LATENCY STATISTICS
+    # =====================================================
+    print(
+        "\n=========================================================="
+    )
+
+    print(
+        "Latency Statistics"
+    )
+
+    print(
+        "=========================================================="
+    )
+
+    _print_latency_block(
+        "Retrieval Latency",
+        build_latency_stats(results, "retrieval_latency")
+    )
+
+    _print_latency_block(
+        "Agent Communication Latency",
+        build_latency_stats(results, "agent_communication_latency")
+    )
+
+    _print_latency_block(
+        "Total Response Time",
+        build_latency_stats(results, "total_response_time")
+    )
+
 
 # =========================================================
 # 🔹 RUN
 # =========================================================
 if __name__ == "__main__":
 
-    dataset_path = (
-        "backend/complex50.json"
+    parser = argparse.ArgumentParser(
+        description="Run Oncology Agentic RAG evaluation and latency statistics."
     )
 
+    parser.add_argument(
+        "--dataset",
+        default="backend/cleaned_output.json",
+        help="Path to the evaluation dataset JSON file."
+    )
+
+    args = parser.parse_args()
+
     results, bert = evaluate(
-        dataset_path
+        args.dataset
     )
 
     print_report(
