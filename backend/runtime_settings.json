@@ -1,6 +1,7 @@
 {
   "enable_laqa": false,
-  "enable_mrl": true,
+  "enable_mrl": false,
+  "enable_rag": true,
   "full_embedding_dimension": 256,
   "mrl_dimension": 512,
   "retrieval_relevance_threshold": 0.65

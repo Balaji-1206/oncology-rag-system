@@ -358,6 +358,8 @@ def update_runtime_settings():
 
     return jsonify({
 
+        "enable_rag": updated["enable_rag"],
+
         "enable_laqa": updated["enable_laqa"],
 
         "enable_mrl": updated["enable_mrl"]

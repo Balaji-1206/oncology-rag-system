@@ -17,8 +17,8 @@
     "context_relevancy": 0.0,
     "hallucinated": 0,
     "retrieval_latency": 0.0,
-    "agent_latency": 16.33685140000307,
-    "total_latency": 16.350135599990608
+    "agent_latency": 15.829791199997999,
+    "total_latency": 15.842980299988994
   },
   {
     "question_id": 2,
@@ -38,7 +38,7 @@
     "context_relevancy": 0.0,
     "hallucinated": 0,
     "retrieval_latency": 0.0,
-    "agent_latency": 13.562251099996502,
-    "total_latency": 13.576483899989398
+    "agent_latency": 13.570446400000947,
+    "total_latency": 13.584317000000738
   }
 ]

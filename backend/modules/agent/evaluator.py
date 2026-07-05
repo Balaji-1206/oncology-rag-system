@@ -3,6 +3,8 @@ import json
 import re
 import numpy as np
 
+import settings
+
 from sentence_transformers import (
     util
 )
@@ -555,6 +557,47 @@ def repetition_penalty(answer):
 
 
 # =========================================================
+# 🔹 DIRECT EVALUATION PROMPT
+# =========================================================
+def build_direct_evaluation_prompt(
+    query,
+    answer
+):
+
+    return f"""
+You are an evaluator for a direct oncology medical answer.
+
+STRICT RULES:
+- No retrieved documents, context, or grounding evidence are available
+- Evaluate only the answer itself and its relevance to the question
+- Penalize vague, incomplete, or off-target answers
+- Do not assume retrieval or context
+- Do not use grounding-based judgments
+
+Return ONLY valid JSON.
+
+JSON FORMAT:
+
+{{
+  "score": 0,
+  "confidence": 0.0,
+  "needs_retry": false,
+  "answered_question": true,
+  "answer_relevance": 0.0,
+  "hallucination_risk": "low",
+  "missing_information": false,
+  "contradiction_risk": 0.0
+}}
+
+QUESTION:
+{query}
+
+ANSWER:
+{answer[:1800]}
+"""
+
+
+# =========================================================
 # 🔹 MAIN EVALUATOR
 # =========================================================
 def evaluate_answer(
@@ -562,6 +605,331 @@ def evaluate_answer(
     context,
     answer
 ):
+
+    if not settings.is_rag_enabled():
+
+        prompt = build_direct_evaluation_prompt(
+            query,
+            answer
+        )
+
+        try:
+
+            response = requests.post(
+                PHI3MINI_URL,
+                json={
+
+                    "model": EVAL_MODEL,
+
+                    "prompt": prompt,
+
+                    "stream": False,
+
+                    "format": "json",
+
+                    "options": {
+
+                        "temperature": 0,
+
+                        "top_p": 0.2,
+
+                        "top_k": 20,
+
+                        "repeat_penalty": 1.05,
+
+                        "num_predict": 120,
+
+                        "num_ctx": 4096,
+
+                        "keep_alive": "30m"
+                    }
+                },
+                timeout=60
+            )
+
+            data = response.json()
+
+            raw_output = data.get(
+                "response",
+                ""
+            ).strip()
+
+            print("\n🧠 EVAL RAW OUTPUT:\n")
+            print(raw_output)
+
+            parsed = extract_json(
+                raw_output
+            )
+
+            score = safe_int(
+                parsed.get("score", 5)
+            )
+
+            confidence = safe_float(
+                parsed.get("confidence", 0.5)
+            )
+
+            answer_relevance = safe_float(
+                parsed.get(
+                    "answer_relevance",
+                    0.5
+                )
+            )
+
+            answered_question = bool(
+                parsed.get(
+                    "answered_question",
+                    True
+                )
+            )
+
+            hallucination_risk = str(
+                parsed.get(
+                    "hallucination_risk",
+                    "medium"
+                )
+            ).lower()
+
+            missing_information = bool(
+                parsed.get(
+                    "missing_information",
+                    False
+                )
+            )
+
+            score = max(
+                0,
+                min(score, 10)
+            )
+
+            confidence = max(
+                0,
+                min(confidence, 1)
+            )
+
+            answer_relevance = max(
+                0,
+                min(answer_relevance, 1)
+            )
+
+            if hallucination_risk not in [
+                "low",
+                "medium",
+                "high"
+            ]:
+
+                hallucination_risk = "medium"
+
+            contradiction = 0.0
+
+            refusal = refusal_detected(
+                answer
+            )
+
+            weak_penalty = weak_summary_penalty(
+                answer
+            )
+
+            directness = direct_answer_score(
+                query,
+                answer
+            )
+
+            needs_coverage = query_requires_coverage(
+                query
+            )
+
+            needs_ranking = query_requires_ranking(
+                query
+            )
+
+            item_count = count_answer_items(
+                answer
+            )
+
+            insufficient_structure = (
+                needs_coverage
+                and item_count < 3
+            )
+
+            missing_ranking = (
+                needs_ranking
+                and not has_ordered_output(answer)
+            )
+
+            repeat_pen = repetition_penalty(
+                answer
+            )
+
+            answer_relevance = max(
+                0,
+                answer_relevance - repeat_pen
+            )
+
+            if weak_penalty:
+
+                answer_relevance = max(
+                    0.0,
+                    answer_relevance - weak_penalty
+                )
+
+                confidence = max(
+                    0.0,
+                    confidence - (
+                        weak_penalty * 0.8
+                    )
+                )
+
+                score = min(score, 6)
+
+            if directness < 0.20:
+
+                answer_relevance = min(
+                    answer_relevance,
+                    0.70
+                )
+
+                confidence = min(
+                    confidence,
+                    0.60
+                )
+
+            if (
+                insufficient_structure
+                or missing_ranking
+            ):
+
+                missing_information = True
+
+                answer_relevance = min(
+                    answer_relevance,
+                    0.52
+                )
+
+                confidence = min(
+                    confidence,
+                    0.58
+                )
+
+                score = min(score, 5)
+
+            retry = False
+
+            if hallucination_risk == "high":
+                retry = True
+
+            elif not answered_question:
+                retry = True
+
+            elif answer_relevance < 0.50:
+                retry = True
+
+            elif score <= 3:
+                retry = True
+
+            if (
+                insufficient_structure
+                or missing_ranking
+            ):
+
+                retry = True
+
+            if refusal:
+
+                retry = True
+
+                score = min(score, 4)
+
+            if (
+                score >= 8
+                and confidence >= 0.75
+                and answer_relevance >= 0.75
+                and contradiction <= 0.25
+                and not missing_information
+                and not insufficient_structure
+                and not missing_ranking
+            ):
+
+                retry = False
+
+            if (
+                confidence > 0.80
+                and (
+                    answer_relevance < 0.80
+                    or contradiction > 0.20
+                    or missing_information
+                )
+            ):
+
+                confidence = 0.80
+
+            return {
+
+                "score": score,
+
+                "confidence": round(
+                    confidence,
+                    2
+                ),
+
+                "needs_retry": retry,
+
+                "answered_question": answered_question,
+
+                "answer_relevance": round(
+                    answer_relevance,
+                    2
+                ),
+
+                "hallucination_risk": hallucination_risk,
+
+                "missing_information": missing_information,
+
+                "grounding_score": 0.0,
+
+                "retrieval_score": 0.0,
+
+                "lexical_grounding_score": 0.0,
+
+                "semantic_grounding_score": 0.0,
+
+                "contradiction_risk": 0.0,
+
+                "refusal_detected": refusal
+            }
+
+        except Exception as e:
+
+            print("❌ EVAL ERROR:", e)
+
+            return {
+
+                "score": 4,
+
+                "confidence": 0.4,
+
+                "needs_retry": True,
+
+                "answered_question": False,
+
+                "answer_relevance": 0.35,
+
+                "hallucination_risk": "medium",
+
+                "missing_information": True,
+
+                "grounding_score": 0.0,
+
+                "retrieval_score": 0.0,
+
+                "lexical_grounding_score": 0.0,
+
+                "semantic_grounding_score": 0.0,
+
+                "contradiction_risk": 0.0,
+
+                "refusal_detected": False
+            }
 
     prompt = f"""
 You are an evaluator for a medical oncology RAG system.

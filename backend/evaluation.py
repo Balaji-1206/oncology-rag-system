@@ -53,6 +53,14 @@ def avg(results, key):
     return float(np.mean(vals))
 
 
+def _report_metric(results, key, direct_mode=False, digits=4):
+
+    if direct_mode:
+        return "N/A"
+
+    return f"{avg(results, key):.{digits}f}"
+
+
 # =========================================================
 # 🔹 QUERY TYPE
 # =========================================================
@@ -210,6 +218,10 @@ def _results_directory():
 
 
 def _experiment_result_filename():
+
+    if not settings.is_rag_enabled():
+
+        return "direct_llm.json"
 
     laqa_state = "on" if settings.is_laqa_enabled() else "off"
     mrl_state = "on" if settings.is_mrl_enabled() else "off"
@@ -668,6 +680,8 @@ def evaluate(dataset_path):
         start=1
     ):
 
+        direct_mode = not settings.is_rag_enabled()
+
         # =====================================================
         # 🔹 QUESTION HEADER
         # =====================================================
@@ -1096,15 +1110,27 @@ def evaluate(dataset_path):
             f"✅ Completed Q{idx}"
         )
 
-        print(
-            f"📊 Grounding : "
-            f"{evaluation.get('grounding_score',0):.2f}"
-        )
+        if direct_mode:
 
-        print(
-            f"📊 Retrieval : "
-            f"{evaluation.get('retrieval_score',0):.2f}"
-        )
+            print(
+                "📊 Grounding : N/A"
+            )
+
+            print(
+                "📊 Retrieval : N/A"
+            )
+
+        else:
+
+            print(
+                f"📊 Grounding : "
+                f"{evaluation.get('grounding_score',0):.2f}"
+            )
+
+            print(
+                f"📊 Retrieval : "
+                f"{evaluation.get('retrieval_score',0):.2f}"
+            )
 
         print(
             f"📊 Confidence: "
@@ -1136,6 +1162,8 @@ def evaluate(dataset_path):
 # =========================================================
 def print_report(results, bert):
 
+    direct_mode = not settings.is_rag_enabled()
+
     print("\n" + "=" * 80)
 
     print(
@@ -1144,6 +1172,10 @@ def print_report(results, bert):
 
     print(
         "Agentic Oncology RAG"
+    )
+
+    print(
+        f"Direct LLM mode   : {direct_mode}"
     )
 
     print(
@@ -1175,7 +1207,7 @@ def print_report(results, bert):
 
     print(
         f"Avg rerank score  : "
-        f"{avg(results,'rerank_score'):.4f}"
+        f"{_report_metric(results, 'rerank_score', direct_mode)}"
     )
 
     # =====================================================
@@ -1186,30 +1218,54 @@ def print_report(results, bert):
         "---------------------------------------------"
     )
 
-    print(
-        f"Precision@5        : "
-        f"{avg(results,'precision'):.4f}"
-    )
+    if direct_mode:
 
-    print(
-        f"Recall@5           : "
-        f"{avg(results,'recall'):.4f}"
-    )
+        print(
+            "Precision@5        : N/A"
+        )
 
-    print(
-        f"MRR                : "
-        f"{avg(results,'mrr'):.4f}"
-    )
+        print(
+            "Recall@5           : N/A"
+        )
 
-    print(
-        f"NDCG@5             : "
-        f"{avg(results,'ndcg'):.4f}"
-    )
+        print(
+            "MRR                : N/A"
+        )
 
-    print(
-        f"Hit-Rate@5         : "
-        f"{avg(results,'hit_rate'):.4f}"
-    )
+        print(
+            "NDCG@5             : N/A"
+        )
+
+        print(
+            "Hit-Rate@5         : N/A"
+        )
+
+    else:
+
+        print(
+            f"Precision@5        : "
+            f"{avg(results,'precision'):.4f}"
+        )
+
+        print(
+            f"Recall@5           : "
+            f"{avg(results,'recall'):.4f}"
+        )
+
+        print(
+            f"MRR                : "
+            f"{avg(results,'mrr'):.4f}"
+        )
+
+        print(
+            f"NDCG@5             : "
+            f"{avg(results,'ndcg'):.4f}"
+        )
+
+        print(
+            f"Hit-Rate@5         : "
+            f"{avg(results,'hit_rate'):.4f}"
+        )
 
     # =====================================================
     # 🔹 GENERATION
@@ -1310,30 +1366,55 @@ def print_report(results, bert):
         "-----------------------------------------"
     )
 
-    print(
-        f"Faithfulness       : "
-        f"{avg(results,'faithfulness'):.4f}"
-    )
+    if direct_mode:
 
-    print(
-        f"Context Relevancy  : "
-        f"{avg(results,'context_rel'):.4f}"
-    )
+        print(
+            "Faithfulness       : N/A"
+        )
 
-    print(
-        f"Answer relevancy   : "
-        f"{avg(results,'answer_rel'):.4f}"
-    )
+        print(
+            "Context Relevancy  : N/A"
+        )
 
-    print(
-        f"Grounding Score    : "
-        f"{avg(results,'grounding_score'):.4f}"
-    )
+        print(
+            f"Answer relevancy   : "
+            f"{avg(results,'answer_rel'):.4f}"
+        )
 
-    print(
-        f"Retrieval Score    : "
-        f"{avg(results,'retrieval_score'):.4f}"
-    )
+        print(
+            "Grounding Score    : N/A"
+        )
+
+        print(
+            "Retrieval Score    : N/A"
+        )
+
+    else:
+
+        print(
+            f"Faithfulness       : "
+            f"{avg(results,'faithfulness'):.4f}"
+        )
+
+        print(
+            f"Context Relevancy  : "
+            f"{avg(results,'context_rel'):.4f}"
+        )
+
+        print(
+            f"Answer relevancy   : "
+            f"{avg(results,'answer_rel'):.4f}"
+        )
+
+        print(
+            f"Grounding Score    : "
+            f"{avg(results,'grounding_score'):.4f}"
+        )
+
+        print(
+            f"Retrieval Score    : "
+            f"{avg(results,'retrieval_score'):.4f}"
+        )
 
     print(
         f"Hallucination Safe : "

@@ -14,6 +14,7 @@ from utils.metadata_tools import classify_query_metadata
 # =========================================================
 ENABLE_LAQA = True
 ENABLE_MRL = False
+ENABLE_RAG = True
 
 MRL_DIMENSION = 512
 FULL_EMBEDDING_DIMENSION = 256
@@ -30,6 +31,7 @@ _LOCK = Lock()
 def _defaults():
 
     return {
+        "enable_rag": ENABLE_RAG,
         "enable_laqa": ENABLE_LAQA,
         "enable_mrl": ENABLE_MRL,
         "mrl_dimension": MRL_DIMENSION,
@@ -80,6 +82,11 @@ def load_settings():
             print(
                 f"WARNING: Failed to read runtime settings: {exc}"
             )
+
+    data["enable_rag"] = _coerce_bool(
+        data.get("enable_rag"),
+        ENABLE_RAG
+    )
 
     data["enable_laqa"] = _coerce_bool(
         data.get("enable_laqa"),
@@ -139,6 +146,13 @@ def update_settings(payload):
 
     current = load_settings()
 
+    if "enable_rag" in payload:
+
+        current["enable_rag"] = _coerce_bool(
+            payload.get("enable_rag"),
+            current["enable_rag"]
+        )
+
     if "enable_laqa" in payload:
 
         current["enable_laqa"] = _coerce_bool(
@@ -171,6 +185,13 @@ def is_laqa_enabled():
 
     return bool(
         load_settings()["enable_laqa"]
+    )
+
+
+def is_rag_enabled():
+
+    return bool(
+        load_settings()["enable_rag"]
     )
 
 
@@ -235,6 +256,7 @@ def public_settings():
     data = load_settings()
 
     return {
+        "enable_rag": data["enable_rag"],
         "enable_laqa": data["enable_laqa"],
         "enable_mrl": data["enable_mrl"]
     }

@@ -419,6 +419,65 @@ def agent_decision(query_input):
         "general"
     )
 
+    if not settings.is_rag_enabled():
+
+        answer = generate_answer({
+
+            "query": laqa_output,
+
+            "context": []
+        })
+
+        context = ""
+
+        eval_result = evaluate_answer(
+            laqa_output["expanded_query"],
+            context,
+            answer
+        )
+
+        eval_result["retrieval_score"] = 0.0
+        eval_result["reranker_confidence"] = 0.0
+        eval_result["retrieval_diagnostics"] = []
+
+        memory.add({
+
+            "attempt": 1,
+
+            "query": laqa_output["expanded_query"],
+
+            "score": eval_result.get("score"),
+
+            "confidence": eval_result.get("confidence"),
+
+            "retrieval_score": 0.0,
+
+            "reranker_confidence": 0.0,
+
+            "missing_information": eval_result.get(
+                "missing_information"
+            ),
+
+            "grounding_score": eval_result.get(
+                "grounding_score"
+            ),
+
+            "answer": answer[:250]
+        })
+
+        return {
+
+            "answer": answer,
+
+            "docs": [],
+
+            "context_docs": [],
+
+            "doc_ids": [],
+
+            "eval": eval_result
+        }
+
     # =====================================================
     # 🔹 ATTEMPTS
     # =====================================================

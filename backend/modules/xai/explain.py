@@ -2,6 +2,8 @@ import re
 import requests
 import numpy as np
 
+import settings
+
 SESSION = requests.Session()
 
 
@@ -781,6 +783,59 @@ Clinical reasoning bullets:
         print("⚠️ Reasoning failed:", e)
 
         return fallback
+
+
+def generate_direct_reasoning(
+    answer,
+    eval_result
+):
+
+    quality = quality_label(
+        eval_result.get(
+            "score",
+            5
+        )
+    )
+
+    confidence = eval_result.get(
+        "confidence",
+        0.5
+    )
+
+    hallucination_risk = str(
+        eval_result.get(
+            "hallucination_risk",
+            "medium"
+        )
+    ).lower()
+
+    bullets = [
+        "The answer was generated directly by the LLM without retrieval.",
+        f"The response is rated {quality.lower()} with confidence {confidence:.2f}."
+    ]
+
+    if hallucination_risk == "high":
+
+        bullets.append(
+            "The answer should be reviewed carefully because the evaluator flagged a high hallucination risk."
+        )
+
+    elif hallucination_risk == "medium":
+
+        bullets.append(
+            "The answer should be interpreted with normal clinical caution because the evaluator marked a medium hallucination risk."
+        )
+
+    else:
+
+        bullets.append(
+            "The answer appears consistent with the model's direct medical response pattern."
+        )
+
+    return "\n".join(
+        f"- {bullet}"
+        for bullet in bullets[:4]
+    )
 # =========================================================
 # 🔹 MAIN EXPLAINER
 # =========================================================
@@ -792,6 +847,33 @@ def generate_explanation(
 ):
 
     explanation = {}
+
+    if not settings.is_rag_enabled():
+
+        explanation[
+            "supporting_sentences"
+        ] = []
+
+        explanation["confidence"] = eval_result.get(
+            "confidence",
+            0.5
+        )
+
+        explanation["quality"] = quality_label(
+            eval_result.get(
+                "score",
+                5
+            )
+        )
+
+        explanation["grounded"] = False
+
+        explanation["reasoning"] = generate_direct_reasoning(
+            answer,
+            eval_result
+        )
+
+        return explanation
 
     # =====================================================
     # 🔹 SUPPORTING EVIDENCE

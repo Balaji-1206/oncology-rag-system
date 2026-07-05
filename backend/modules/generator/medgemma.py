@@ -1,6 +1,8 @@
 import requests
 import re
 
+import settings
+
 SESSION = requests.Session()
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -471,6 +473,106 @@ def clean_output(answer):
 
 
 # =========================================================
+# 🔹 DIRECT OUTPUT CLEANUP
+# =========================================================
+# Direct LLM mode should only remove formatting artifacts.
+def clean_direct_output(answer):
+
+    if not answer:
+        return ""
+
+    raw = answer.strip()
+
+    reasoning_prefixes = [
+        "thought",
+        "thinking",
+        "analysis",
+        "reasoning",
+        "step-by-step",
+        "scratchpad",
+        "chain of thought"
+    ]
+
+    starts_with_reasoning = any(
+        raw.lower().startswith(prefix)
+        for prefix in reasoning_prefixes
+    )
+
+    final_markers = [
+        "final answer:",
+        "answer:",
+        "final answer",
+        "final medical answer:"
+    ]
+
+    extracted = raw
+
+    for marker in final_markers:
+
+        marker_index = raw.lower().find(marker)
+
+        if marker_index != -1:
+
+            extracted = raw[marker_index + len(marker):]
+            break
+
+    if starts_with_reasoning and extracted == raw:
+
+        return ""
+
+    answer = extracted
+
+    answer = re.sub(
+        r"(?s)<think>.*?</think>",
+        "",
+        answer
+    )
+
+    answer = re.sub(
+        r"(?s)<analysis>.*?</analysis>",
+        "",
+        answer
+    )
+
+    answer = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        answer
+    )
+
+    answer = re.sub(
+        r"(?im)^(thought|thinking|analysis|reasoning|step-by-step|scratchpad|chain of thought)\s*:?",
+        "",
+        answer
+    )
+
+    lines = []
+    seen = set()
+
+    for line in answer.split("\n"):
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        prefix = " ".join(
+            line.lower().split()[:6]
+        )
+
+        if prefix in seen:
+            continue
+
+        seen.add(prefix)
+
+        lines.append(line)
+
+    answer = "\n".join(lines)
+
+    return answer.strip()
+
+
+# =========================================================
 # 🔹 VALIDATION
 # =========================================================
 def validate_answer(answer):
@@ -604,21 +706,11 @@ def build_directness_rules():
 
 
 # =========================================================
-# 🔹 PROMPT BUILDER
+# 🔹 PROMPT TEMPLATES
 # =========================================================
-def build_prompt(
-    query,
-    context,
-    intent,
-    query_type
-):
-
-    answer_style = build_answer_style(
-        intent,
-        query_type
-    )
-
-    prompt = f"""
+# Keep the RAG prompt and the direct-LLM prompt separate so
+# enable_rag can switch behavior without changing generation code.
+PROMPT_WITH_CONTEXT = """
 You are an oncology medical assistant.
 
 RULES:
@@ -644,7 +736,66 @@ QUESTION:
 Provide only the final answer:
 """
 
-    return prompt
+PROMPT_WITHOUT_CONTEXT = """
+You are an expert oncology medical assistant.
+
+Answer the user's medical question directly.
+
+Return ONLY the final answer.
+
+Do NOT show your reasoning.
+
+Do NOT show your thinking.
+
+Do NOT output words such as:
+
+thought
+
+thinking
+
+analysis
+
+reasoning
+
+step-by-step
+
+scratchpad
+
+chain of thought
+
+Only return the final medical answer.
+
+If you are uncertain, state that clearly instead of inventing information.
+
+Question:
+
+{question}
+
+Final Answer:
+
+"""
+
+
+# =========================================================
+# 🔹 PROMPT BUILDER
+# =========================================================
+def build_prompt(
+    query,
+    context,
+    intent,
+    query_type
+):
+
+    answer_style = build_answer_style(
+        intent,
+        query_type
+    )
+
+    return PROMPT_WITH_CONTEXT.format(
+        answer_style=answer_style,
+        context=context,
+        query=query
+    )
 
 # =========================================================
 # 🔹 RESPONSE OPTIONS
@@ -712,6 +863,50 @@ def build_generation_options(query_type="general"):
         ]
     }
 
+
+def build_direct_generation_options(query_type="general"):
+
+    if query_type in [
+        "list",
+        "ranking"
+    ]:
+        num_predict = 180
+
+    elif query_type in [
+        "definition",
+        "yesno"
+    ]:
+        num_predict = 110
+
+    else:
+        num_predict = 140
+
+    return {
+
+        "temperature": 0,
+
+        "top_p": 0.82,
+
+        "top_k": 30,
+
+        "repeat_penalty": 1.12,
+
+        "num_predict": num_predict,
+
+        "num_ctx": 2048,
+
+        "num_thread": 8,
+
+        "num_batch": 256,
+
+        "keep_alive": "60m",
+
+        "stop": [
+
+            "</think>"
+        ]
+    }
+
 # =========================================================
 # 🔹 MAIN GENERATOR
 # =========================================================
@@ -733,19 +928,39 @@ def generate_answer(agent_output):
 
     docs = agent_output["context"]
 
-    context = build_context(
-        docs,
-        query,
-        intent,
-        query_type
-    )
+    if settings.is_rag_enabled():
 
-    prompt = build_prompt(
-        query,
-        context,
-        intent,
-        query_type
-    )
+        context = build_context(
+            docs,
+            query,
+            intent,
+            query_type
+        )
+
+        prompt = build_prompt(
+            query,
+            context,
+            intent,
+            query_type
+        )
+
+    else:
+
+        prompt = PROMPT_WITHOUT_CONTEXT.format(
+            question=query
+        )
+
+    if settings.is_rag_enabled():
+
+        generation_options = build_generation_options(
+            query_type
+        )
+
+    else:
+
+        generation_options = build_direct_generation_options(
+            query_type
+        )
 
     try:
 
@@ -759,9 +974,7 @@ def generate_answer(agent_output):
 
                 "stream": False,
 
-                "options": build_generation_options(
-                    query_type
-                )
+                "options": generation_options
             },
             timeout=45
         )
@@ -770,13 +983,22 @@ def generate_answer(agent_output):
             "response",
             ""
         )
+        # print(repr(raw_answer))
         
         print("\n🧠 RAW GENERATER ANSWER:")
         print(raw_answer)
 
-        answer = clean_output(
-            raw_answer
-        )
+        if settings.is_rag_enabled():
+
+            answer = clean_output(
+                raw_answer
+            )
+
+        else:
+
+            answer = clean_direct_output(
+                raw_answer
+            )
 
         if not answer.strip():
 

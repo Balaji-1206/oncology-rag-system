@@ -29,16 +29,26 @@ def handle_query(user_query: str):
 
         laqa_start = time.time()
 
-        if settings.is_laqa_enabled():
+        if settings.is_rag_enabled() and settings.is_laqa_enabled():
 
             laqa_output = process_query(
+                user_query
+            )
+
+        elif settings.is_rag_enabled():
+
+            print(
+                "LAQA disabled: using raw user query."
+            )
+
+            laqa_output = settings.build_raw_query_payload(
                 user_query
             )
 
         else:
 
             print(
-                "LAQA disabled: using raw user query."
+                "RAG disabled: bypassing LAQA and retrieval."
             )
 
             laqa_output = settings.build_raw_query_payload(

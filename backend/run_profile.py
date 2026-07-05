@@ -1,5 +1,7 @@
 import json
 
+import settings
+
 from profile_pipeline import (
     PipelineProfiler,
     profile_pipeline
@@ -61,70 +63,109 @@ def question_runner(
     question_id
 ):
 
+    rag_enabled = settings.is_rag_enabled()
+
     # -----------------------------------------------------
     # 1️⃣ LAQA
     # -----------------------------------------------------
-    with profiler.profile_stage("LAQA"):
+    if rag_enabled:
 
-        laqa_result = process_query(
-            question
-        )
+        with profiler.profile_stage("LAQA"):
 
-        expanded_query = laqa_result.get(
-            "expanded_query",
-            question
-        )
+            laqa_result = process_query(
+                question
+            )
 
-        print("\n🧠 LAQA PARSED:")
+            expanded_query = laqa_result.get(
+                "expanded_query",
+                question
+            )
+
+            print("\n🧠 LAQA PARSED:")
+
+            print(
+                json.dumps(
+                    laqa_result,
+                    indent=2
+                )
+            )
+
+    else:
 
         print(
-            json.dumps(
-                laqa_result,
-                indent=2
-            )
+            "RAG disabled: skipping LAQA and retrieval stages."
         )
+
+        laqa_result = settings.build_raw_query_payload(
+            question
+        )
+
+        expanded_query = question
 
     # -----------------------------------------------------
     # 2️⃣ QUERY EXPANSION
     # -----------------------------------------------------
-    with profiler.profile_stage("Query Expansion"):
+    if rag_enabled:
 
-        final_query = expanded_query
+        with profiler.profile_stage("Query Expansion"):
+
+            final_query = expanded_query
+
+    else:
+
+        final_query = question
 
     # -----------------------------------------------------
     # 3️⃣ DENSE EMBEDDING
     # -----------------------------------------------------
-    with profiler.profile_stage("Dense Embedding"):
+    if rag_enabled:
 
-        profiler.note_embedding_call(
-            final_query
-        )
+        with profiler.profile_stage("Dense Embedding"):
+
+            profiler.note_embedding_call(
+                final_query
+            )
 
     # -----------------------------------------------------
     # 4️⃣ FAISS SEARCH
     # -----------------------------------------------------
-    with profiler.profile_stage("FAISS Search"):
+    if rag_enabled:
 
-        retrieval_results = hybrid_search(
-            laqa_result,
-            None
-        )
+        with profiler.profile_stage("FAISS Search"):
+
+            retrieval_results = hybrid_search(
+                laqa_result,
+                None
+            )
+
+    else:
+
+        retrieval_results = {
+
+            "texts": [],
+
+            "ids": []
+        }
 
     # -----------------------------------------------------
     # 5️⃣ BM25
     # already inside hybrid_search
     # -----------------------------------------------------
-    with profiler.profile_stage("BM25 Retrieval"):
+    if rag_enabled:
 
-        pass
+        with profiler.profile_stage("BM25 Retrieval"):
+
+            pass
 
     # -----------------------------------------------------
     # 6️⃣ HYBRID FUSION
     # already inside hybrid_search
     # -----------------------------------------------------
-    with profiler.profile_stage("Hybrid Fusion"):
+    if rag_enabled:
 
-        pass
+        with profiler.profile_stage("Hybrid Fusion"):
+
+            pass
 
     # -----------------------------------------------------
     # 🔹 DOCS
@@ -148,22 +189,34 @@ def question_runner(
     # -----------------------------------------------------
     # 7️⃣ RERANKER
     # -----------------------------------------------------
-    with profiler.profile_stage("Reranker"):
+    if rag_enabled:
 
-        reranked_docs = rerank(
-            final_query,
-            docs,
-            top_k=5
-        )
+        with profiler.profile_stage("Reranker"):
+
+            reranked_docs = rerank(
+                final_query,
+                docs,
+                top_k=5
+            )
+
+    else:
+
+        reranked_docs = []
 
     # -----------------------------------------------------
     # 8️⃣ CONTEXT BUILDING
     # -----------------------------------------------------
-    with profiler.profile_stage("Context Building"):
+    if rag_enabled:
 
-        context = "\n\n".join(
-            reranked_docs
-        )
+        with profiler.profile_stage("Context Building"):
+
+            context = "\n\n".join(
+                reranked_docs
+            )
+
+    else:
+
+        context = ""
 
     # -----------------------------------------------------
     # 9️⃣ GENERATION
