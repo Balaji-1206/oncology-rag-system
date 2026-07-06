@@ -9,7 +9,7 @@ from scipy import stats
 
 
 DEFAULT_EXPERIMENT_A = os.path.join("backend", "results", "laqa_on_mrl_on.json")
-DEFAULT_EXPERIMENT_B = os.path.join("backend", "results", "laqa_off_mrl_on.json")
+DEFAULT_EXPERIMENT_B = os.path.join("backend", "results", "direct_llm.json")
 DEFAULT_METRIC = "grounding_score"
 
 
@@ -354,8 +354,8 @@ def print_report(result: Dict[str, Any]) -> None:
     print("Paired t-test")
     print("--------------------------------------------------")
     print("")
-    _print_kv("t-statistic", f"{result['t_statistic']:.4f}")
-    _print_kv("p-value", f"{result['p_value']:.4f}")
+    _print_kv("t-statistic", f"{result['t_statistic']:.8f}")
+    _print_kv("p-value", f"{result['p_value']:.8f}")
     _print_kv(
         "Statistically Significant",
         "YES (p < 0.05)" if result["significant"] else "NO"

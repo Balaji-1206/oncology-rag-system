@@ -665,12 +665,12 @@ def evaluate(dataset_path):
     print("\n🚀 Running Evaluation...\n")
 
     total_questions = min(
-        2,
+        200,
         len(data)
     )
 
     progress_bar = tqdm(
-        data[:2],
+        data[:200],
         desc="🧪 Evaluating",
         ncols=120
     )

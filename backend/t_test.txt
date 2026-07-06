@@ -14,24 +14,24 @@ Metric Compared
 
 Grounding Score
 
-Questions Compared                       : 2
+Questions Compared                       : 200
 
 --------------------------------------------------
 Descriptive Statistics
 --------------------------------------------------
 
-Mean Grounding Score (Experiment A)      : 0.5100
-Mean Grounding Score (Experiment B)      : 0.5400
-Mean Difference (A - B)                  : -0.0300
-Standard Deviation of Differences        : 0.0990
+Mean Grounding Score (Experiment A)      : 0.7526
+Mean Grounding Score (Experiment B)      : 0.6736
+Mean Difference (A - B)                  : 0.0790
+Standard Deviation of Differences        : 0.2198
 
 --------------------------------------------------
 Paired t-test
 --------------------------------------------------
 
-t-statistic                              : -0.4286
-p-value                                  : 0.7422
-Statistically Significant                : NO
+t-statistic                              : 5.07970221
+p-value                                  : 0.00000087
+Statistically Significant                : YES (p < 0.05)
 
 --------------------------------------------------
 95% Confidence Interval
@@ -39,8 +39,8 @@ Statistically Significant                : NO
 
 Confidence Interval (A - B)
 
-Lower Bound                              : -0.9194
-Upper Bound                              : 0.8594
+Lower Bound                              : 0.0483
+Upper Bound                              : 0.1096
 
 Interpretation
 
@@ -52,7 +52,7 @@ this interval.
 Effect Size
 --------------------------------------------------
 
-Cohen's d                                : -0.3030
+Cohen's d                                : 0.3592
 
 Interpretation
 
@@ -61,3 +61,207 @@ Medium Effect    : |d| ≈ 0.50
 Large Effect     : |d| ≥ 0.80
 
 Observed Effect                          : Medium
+
+==================================================
+
+
+
+==================================================
+PAIRED T-TEST REPORT
+==================================================
+
+Experiment A                             : LAQA + MRL
+File                                     : backend\results\laqa_on_mrl_on.json
+
+Experiment B                             : LAQA without MRL
+File                                     : backend\results\laqa_on_mrl_off.json
+
+--------------------------------------------------
+Metric Compared
+--------------------------------------------------
+
+Grounding Score
+
+Questions Compared                       : 200
+
+--------------------------------------------------
+Descriptive Statistics
+--------------------------------------------------
+
+Mean Grounding Score (Experiment A)      : 0.7526
+Mean Grounding Score (Experiment B)      : 0.6337
+Mean Difference (A - B)                  : 0.1189
+Standard Deviation of Differences        : 0.2396
+
+--------------------------------------------------
+Paired t-test
+--------------------------------------------------
+
+t-statistic                              : 7.01701526
+p-value                                  : 0.00000000
+Statistically Significant                : YES (p < 0.05)
+
+--------------------------------------------------
+95% Confidence Interval
+--------------------------------------------------
+
+Confidence Interval (A - B)
+
+Lower Bound                              : 0.0855
+Upper Bound                              : 0.1523
+
+Interpretation
+
+We are 95% confident that the true mean difference
+between Experiment A and Experiment B lies within
+this interval.
+
+--------------------------------------------------
+Effect Size
+--------------------------------------------------
+
+Cohen's d                                : 0.4962
+
+Interpretation
+
+Small Effect     : |d| < 0.20
+Medium Effect    : |d| ≈ 0.50
+Large Effect     : |d| ≥ 0.80
+
+Observed Effect                          : Medium
+
+==================================================
+
+
+==================================================
+PAIRED T-TEST REPORT
+==================================================
+
+Experiment A                             : LAQA + MRL
+File                                     : backend\results\laqa_on_mrl_on.json
+
+Experiment B                             : Without LAQA / MRL Off
+File                                     : backend\results\laqa_off_mrl_off.json
+
+--------------------------------------------------
+Metric Compared
+--------------------------------------------------
+
+Grounding Score
+
+Questions Compared                       : 200
+
+--------------------------------------------------
+Descriptive Statistics
+--------------------------------------------------
+
+Mean Grounding Score (Experiment A)      : 0.7526
+Mean Grounding Score (Experiment B)      : 0.5716
+Mean Difference (A - B)                  : 0.1810
+Standard Deviation of Differences        : 0.2126
+
+--------------------------------------------------
+Paired t-test
+--------------------------------------------------
+
+t-statistic                              : 12.03886252
+p-value                                  : 0.00000000
+Statistically Significant                : YES (p < 0.05)
+
+--------------------------------------------------
+95% Confidence Interval
+--------------------------------------------------
+
+Confidence Interval (A - B)
+
+Lower Bound                              : 0.1513
+Upper Bound                              : 0.2106
+
+Interpretation
+
+We are 95% confident that the true mean difference
+between Experiment A and Experiment B lies within
+this interval.
+
+--------------------------------------------------
+Effect Size
+--------------------------------------------------
+
+Cohen's d                                : 0.8513
+
+Interpretation
+
+Small Effect     : |d| < 0.20
+Medium Effect    : |d| ≈ 0.50
+Large Effect     : |d| ≥ 0.80
+
+Observed Effect                          : Large
+
+==================================================
+
+
+==================================================
+PAIRED T-TEST REPORT
+==================================================
+
+Experiment A                             : LAQA + MRL
+File                                     : backend\results\laqa_on_mrl_on.json
+
+Experiment B                             : direct_llm.json
+File                                     : backend\results\direct_llm.json
+
+--------------------------------------------------
+Metric Compared
+--------------------------------------------------
+
+Grounding Score
+
+Questions Compared                       : 200
+
+--------------------------------------------------
+Descriptive Statistics
+--------------------------------------------------
+
+Mean Grounding Score (Experiment A)      : 0.7526
+Mean Grounding Score (Experiment B)      : 0.0001
+Mean Difference (A - B)                  : 0.7525
+Standard Deviation of Differences        : 0.2291
+
+--------------------------------------------------
+Paired t-test
+--------------------------------------------------
+
+t-statistic                              : 46.44840641
+p-value                                  : 0.00000000
+Statistically Significant                : YES (p < 0.05)
+
+--------------------------------------------------
+95% Confidence Interval
+--------------------------------------------------
+
+Confidence Interval (A - B)
+
+Lower Bound                              : 0.7206
+Upper Bound                              : 0.7845
+
+Interpretation
+
+We are 95% confident that the true mean difference
+between Experiment A and Experiment B lies within
+this interval.
+
+--------------------------------------------------
+Effect Size
+--------------------------------------------------
+
+Cohen's d                                : 3.2844
+
+Interpretation
+
+Small Effect     : |d| < 0.20
+Medium Effect    : |d| ≈ 0.50
+Large Effect     : |d| ≥ 0.80
+
+Observed Effect                          : Large
+
+==================================================
