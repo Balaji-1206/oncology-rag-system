@@ -32,3 +32,11 @@ backend/database/
 # Python
 __pycache__/
 *.pyc
+
+results/
+
+# Evaluation text files (ignored)
+Note.txt
+Metrics.txt
+data.txt
+t_test.txt

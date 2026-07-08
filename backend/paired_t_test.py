@@ -10,7 +10,7 @@ from scipy import stats
 
 DEFAULT_EXPERIMENT_A = os.path.join("backend", "results", "laqa_on_mrl_on.json")
 DEFAULT_EXPERIMENT_B = os.path.join("backend", "results", "direct_llm.json")
-DEFAULT_METRIC = "grounding_score"
+DEFAULT_METRIC = "faithfulness"
 
 
 def load_json_records(path: str) -> List[Dict[str, Any]]:

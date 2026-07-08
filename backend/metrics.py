@@ -7,7 +7,7 @@ from functools import lru_cache
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from nltk.translate.gleu_score import sentence_gleu
 from rouge_score import rouge_scorer
-from bert_score import score as bert_score
+from bert_score import BERTScorer
 from transformers import AutoTokenizer, AutoModel
 from sentence_transformers import util
 from nltk.translate.meteor_score import meteor_score
@@ -186,9 +186,18 @@ def compute_rouge_scores(ref, pred):
     except Exception:
         return {"rouge1": 0.0, "rouge2": 0.0, "rougeL": 0.0, "rougeLsum": 0.0}
 
+_bert_scorer = None
+
 def compute_bertscore(refs, preds):
+    global _bert_scorer
     try:
-        P, R, F1 = bert_score(preds, refs, lang="en", verbose=False)
+        if isinstance(refs, str):
+            refs = [refs]
+        if isinstance(preds, str):
+            preds = [preds]
+        if _bert_scorer is None:
+            _bert_scorer = BERTScorer(lang="en")
+        P, R, F1 = _bert_scorer.score(preds, refs)
         return float(F1.mean())
     except Exception:
         return 0.0

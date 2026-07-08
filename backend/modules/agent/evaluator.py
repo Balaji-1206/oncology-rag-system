@@ -2,9 +2,7 @@ import requests
 import json
 import re
 import numpy as np
-
 import settings
-
 from sentence_transformers import (
     util
 )

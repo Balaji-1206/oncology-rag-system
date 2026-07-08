@@ -1,6 +1,5 @@
 import requests
 import re
-
 import settings
 
 SESSION = requests.Session()

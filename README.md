@@ -36,15 +36,6 @@ The system supports dual indexing modes (MRL and full) for flexible query strate
 - **Embeddings**: Matryoshka Representation Learning (MRL) — efficient multi-scale embeddings
 - **Algorithm**: Hybrid retrieval (sparse + dense) — combines BM25 keyword matching with semantic search
 
-### Evaluation Metrics
-The system is evaluated using:
-- **Standard Metrics**: Accuracy, F1, BLEU, GLEU, ROUGE-L, DISTINCT-1
-- **RAG-Specific Frameworks**:
-  - S.C.O.P.E framework (Specificity, Completeness, Organization, Precision, Evidence)
-  - RAGAS framework (Retrieval-Augmented Generation Assessment Suite)
-- **Semantic Similarity**: BERTScore, SBERT
-- **LLM-Based Evaluation**: LLM-as-a-judge for nuanced answer quality assessment
-
 ## System Requirements
 
 - **OS**: Windows 10/11
@@ -146,9 +137,11 @@ oncology-agentic-rag/
 │   ├── app.py                  # FastAPI application entry point
 │   ├── server.py               # Server utilities
 │   ├── index_data.py           # Data indexing pipeline
-│   ├── evaluation.py           # Evaluation framework (RAGAS, S.C.O.P.E)
-│   ├── metrics.py              # Evaluation metrics (accuracy, ROUGE, BLEU, etc)
-│   ├── profile_pipeline.py     # Performance profiling tools
+│   ├── evaluation.py           # Execution testing script
+│   ├── metrics.py              # Text scoring helper utility
+│   ├── latency/
+│   │   ├── profile_pipeline.py # Pipeline profiling utility
+│   │   └── run_profile.py      # Profiler execution script
 │   │
 │   ├── config/
 │   │   └── settings.py         # Configuration and environment settings
@@ -201,29 +194,13 @@ oncology-agentic-rag/
 - `database/full/` — Full embeddings for comprehensive search
 - `modules/` — Each module corresponds to a pipeline stage (LAQA → Chunking → Embeddings → Retrieval → Generation → X-AI)
 
-## Testing & Evaluation
+## Testing
 
 ### Run Tests
 ```bash
 pytest                    # Run all tests
 pytest -v               # Verbose output
 pytest tests/test_*.py  # Specific test file
-```
-
-### Evaluate RAG Pipeline
-The system includes comprehensive evaluation using multiple frameworks:
-
-```bash
-# Run evaluation with RAGAS & S.C.O.P.E frameworks
-python evaluation.py --queries sample_queries.json
-
-# View metrics (Accuracy, ROUGE-L, BLEU, BERTScore, etc)
-python metrics.py --results evaluation_results.json
-```
-
-### Profile Performance
-```bash
-python profile_pipeline.py  # Measure latency and resource usage
 ```
 
 ## Configuration
@@ -339,7 +316,6 @@ python index_data.py --input ./data/oncology_docs --store-type mrl
 **Low answer quality:**
 - Try `--store-type full` for more comprehensive retrieval
 - Check if enough relevant documents were indexed
-- Review `evaluation.py` metrics for diagnosis
 
 ## Contributing
 
@@ -356,16 +332,9 @@ python index_data.py --input ./data/oncology_docs --store-type mrl
    - Generation prompts
    - X-AI explainability
 
-3. **Add Evaluation Metrics** — Improve quality assessment:
-   - Medical-specific metrics
-   - Domain evaluation frameworks
-   - Benchmark datasets
-
 ### Before Submitting
 ```bash
 pytest                          # Run tests
-python evaluation.py            # Evaluate changes
-python profile_pipeline.py      # Check performance
 ```
 
 **Keep PRs focused** — one feature or fix per PR.

@@ -368,7 +368,7 @@ python index_data.py
 
 ✅ `backend/app.py` - Uses retriever transparently via `agent_decision()`
 ✅ `backend/evaluation.py` - Uses retriever transparently via `app.handle_query()`
-✅ `backend/run_profile.py` - Calls `hybrid_search()` with same signature
+✅ `backend/latency/run_profile.py` - Calls `hybrid_search()` with same signature
 ✅ `backend/modules/agent/agent_controller.py` - Calls `hybrid_search()` unchanged
 ✅ `backend/modules/retrieval/reranker.py` - Receives texts unchanged
 ✅ `backend/modules/xai/explain.py` - Uses retrieval results unchanged

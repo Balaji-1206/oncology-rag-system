@@ -8,13 +8,10 @@ import settings
 import os
 import shutil
 from datetime import datetime
-
 from modules.retrieval.reranker import rerank
-
 from modules.embeddings.mrl_embeddings import (
     get_dynamic_mrl_embedding
 )
-
 from utils.metadata_tools import (
     classify_query_metadata,
     metadata_match_score,

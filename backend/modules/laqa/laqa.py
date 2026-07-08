@@ -2,7 +2,6 @@ import requests
 import json
 import re
 import settings
-
 from utils.metadata_tools import classify_query_metadata
 
 SESSION = requests.Session()

@@ -665,12 +665,12 @@ def evaluate(dataset_path):
     print("\n🚀 Running Evaluation...\n")
 
     total_questions = min(
-        200,
+        100,
         len(data)
     )
 
     progress_bar = tqdm(
-        data[:200],
+        data[:100],
         desc="🧪 Evaluating",
         ncols=120
     )
@@ -1564,7 +1564,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--dataset",
-        default="backend/cleaned_output.json",
+        default="backend/questions/cleaned_output.json",
         help="Path to the evaluation dataset JSON file."
     )
 

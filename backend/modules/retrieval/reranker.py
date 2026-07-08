@@ -2,7 +2,6 @@ from sentence_transformers import CrossEncoder
 import numpy as np
 import re
 
-
 # =========================================================
 # 🔹 LOAD ONCE
 # =========================================================

@@ -1,6 +1,5 @@
 import os
 import re
-
 from PyPDF2 import PdfReader
 
 from utils.metadata_tools import (

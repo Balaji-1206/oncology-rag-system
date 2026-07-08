@@ -1,9 +1,7 @@
 import re
 import requests
 import numpy as np
-
 import settings
-
 SESSION = requests.Session()
 
 
