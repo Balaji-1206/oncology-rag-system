@@ -278,7 +278,7 @@ def weak_answer(
     answer
 ):
 
-    if len(answer.strip()) < 25:
+    if len(answer.strip()) < 3:
         return True
 
     weak_patterns = [
@@ -475,7 +475,9 @@ def agent_decision(query_input):
 
             "doc_ids": [],
 
-            "eval": eval_result
+            "eval": eval_result,
+
+            "candidate_texts": []
         }
 
     # =====================================================
@@ -733,7 +735,9 @@ def agent_decision(query_input):
 
                 "doc_ids": doc_ids,
 
-                "eval": eval_result
+                "eval": eval_result,
+
+                "candidate_texts": retrieval_result.get("candidate_texts", [])
             }
 
         # =====================================================
@@ -800,5 +804,7 @@ def agent_decision(query_input):
             "retrieval_score": 0.0,
 
             "reranker_confidence": 0.0
-        }
+        },
+
+        "candidate_texts": []
     }

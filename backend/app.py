@@ -201,6 +201,11 @@ def handle_query(user_query: str):
                 docs
             ),
 
+            "candidate_texts": agent_result.get(
+                "candidate_texts",
+                []
+            ),
+
             # 🔥 XAI
             "explanation": explanation,
 
@@ -284,6 +289,8 @@ def handle_query(user_query: str):
 
                 "hallucination_risk": "medium"
             },
+
+            "candidate_texts": [],
 
             "metrics": {
 

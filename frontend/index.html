@@ -481,6 +481,33 @@ input:disabled{
     font-weight:600;
 }
 
+.db-select {
+    width: 100%;
+    padding: 7px 11px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--soft);
+    font-size: 11.5px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    font-family: inherit;
+}
+.db-select:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(91, 140, 201, 0.35);
+}
+.db-select:focus {
+    border-color: var(--primary);
+    background: #0c1020;
+}
+.db-select option {
+    background: #0c1020;
+    color: var(--text);
+}
+
 .switch{
     position:relative;
     display:inline-flex;
@@ -2284,6 +2311,13 @@ input:disabled{
                             <span class="switch-slider"></span>
                         </span>
                     </label>
+                    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px; width: 100%; text-align: left;">
+                        <span style="color: var(--muted); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Active Database</span>
+                        <select id="selectDb" class="db-select" onchange="updateFeatureSettings()">
+                            <option value="mrl">Default Index (MRL)</option>
+                            <option value="dockling_mrl">Docling Index (MRL)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2501,11 +2535,13 @@ function useSuggestedPrompt(query){
 function applyFeatureSettings(settings){
     featureSettings = {
         enable_laqa: Boolean(settings.enable_laqa),
-        enable_mrl: Boolean(settings.enable_mrl)
+        enable_mrl: Boolean(settings.enable_mrl),
+        active_database: settings.active_database || 'mrl'
     };
 
     const laqaToggle = document.getElementById('toggleLaqa');
     const mrlToggle = document.getElementById('toggleMrl');
+    const dbSelect = document.getElementById('selectDb');
 
     if(laqaToggle){
         laqaToggle.checked = featureSettings.enable_laqa;
@@ -2513,6 +2549,10 @@ function applyFeatureSettings(settings){
 
     if(mrlToggle){
         mrlToggle.checked = featureSettings.enable_mrl;
+    }
+
+    if(dbSelect){
+        dbSelect.value = featureSettings.active_database;
     }
 }
 
@@ -2531,15 +2571,19 @@ async function loadFeatureSettings(){
 async function updateFeatureSettings(){
     const laqaToggle = document.getElementById('toggleLaqa');
     const mrlToggle = document.getElementById('toggleMrl');
+    const dbSelect = document.getElementById('selectDb');
     const previousMrl = featureSettings.enable_mrl;
+    const previousDb = featureSettings.active_database;
 
     const payload = {
         enable_laqa: Boolean(laqaToggle && laqaToggle.checked),
-        enable_mrl: Boolean(mrlToggle && mrlToggle.checked)
+        enable_mrl: Boolean(mrlToggle && mrlToggle.checked),
+        active_database: dbSelect ? dbSelect.value : 'mrl'
     };
 
-    [laqaToggle, mrlToggle].forEach(toggle => {
-        if(toggle) toggle.disabled = true;
+    const togglesToDisable = [laqaToggle, mrlToggle, dbSelect].filter(el => el !== null);
+    togglesToDisable.forEach(toggle => {
+        toggle.disabled = true;
     });
 
     try{
@@ -2563,7 +2607,7 @@ async function updateFeatureSettings(){
         applyFeatureSettings(data);
         showToast('Feature settings updated', 'success');
 
-        if(previousMrl !== data.enable_mrl){
+        if(previousMrl !== data.enable_mrl || previousDb !== data.active_database){
             showToast('Switching retrieval database...', 'info');
         }
 
@@ -2572,8 +2616,8 @@ async function updateFeatureSettings(){
         applyFeatureSettings(featureSettings);
         showToast('Could not update feature settings', 'error');
     }finally{
-        [laqaToggle, mrlToggle].forEach(toggle => {
-            if(toggle) toggle.disabled = false;
+        togglesToDisable.forEach(toggle => {
+            toggle.disabled = false;
         });
     }
 }

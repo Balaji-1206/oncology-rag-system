@@ -26,14 +26,14 @@ from utils.metadata_tools import normalize_metadata_record
 # =========================================================
 # 🔹 PATHS
 # =========================================================
-DATA_PATH = "backend/data/oncology_docs"
+DATA_PATH = os.path.join(settings.BACKEND_DIR, "data", "oncology_docs")
 
 # Determine target database based on MRL setting
 target_db = "mrl" if settings.is_mrl_enabled() else "full"
-SAVE_PATH = f"backend/database/{target_db}"
+SAVE_PATH = os.path.join(settings.BACKEND_DIR, "database", target_db)
 
 # Ensure base database directory exists
-os.makedirs("backend/database", exist_ok=True)
+os.makedirs(os.path.join(settings.BACKEND_DIR, "database"), exist_ok=True)
 
 # Create target database directory
 os.makedirs(SAVE_PATH, exist_ok=True)

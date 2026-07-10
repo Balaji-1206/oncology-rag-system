@@ -12,3 +12,5 @@ rouge-score
 bert-score
 tqdm
 scipy
+transformers
+pytest

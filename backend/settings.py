@@ -20,8 +20,10 @@ MRL_DIMENSION = 512
 FULL_EMBEDDING_DIMENSION = 256
 RETRIEVAL_RELEVANCE_THRESHOLD = 0.65
 
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+
 _SETTINGS_PATH = os.path.join(
-    os.path.dirname(__file__),
+    BACKEND_DIR,
     "runtime_settings.json"
 )
 
@@ -36,7 +38,8 @@ def _defaults():
         "enable_mrl": ENABLE_MRL,
         "mrl_dimension": MRL_DIMENSION,
         "full_embedding_dimension": FULL_EMBEDDING_DIMENSION,
-        "retrieval_relevance_threshold": RETRIEVAL_RELEVANCE_THRESHOLD
+        "retrieval_relevance_threshold": RETRIEVAL_RELEVANCE_THRESHOLD,
+        "active_database": "mrl"
     }
 
 
@@ -116,6 +119,10 @@ def load_settings():
         )
     )
 
+    data["active_database"] = str(
+        data.get("active_database", "mrl")
+    )
+
     return data
 
 
@@ -176,6 +183,12 @@ def update_settings(payload):
             )
         )
 
+    if "active_database" in payload:
+
+        current["active_database"] = str(
+            payload.get("active_database")
+        )
+
     save_settings(current)
 
     return current
@@ -195,7 +208,19 @@ def is_rag_enabled():
     )
 
 
+def get_active_database():
+
+    env_val = os.environ.get("ACTIVE_DATABASE")
+    if env_val:
+        return env_val
+    return load_settings().get("active_database", "mrl")
+
+
 def is_mrl_enabled():
+
+    active_db = get_active_database()
+    if active_db == "dockling_mrl":
+        return True
 
     return bool(
         load_settings()["enable_mrl"]
@@ -203,6 +228,10 @@ def is_mrl_enabled():
 
 
 def effective_embedding_dimension():
+
+    active_db = get_active_database()
+    if active_db == "dockling_mrl":
+        return 512
 
     data = load_settings()
 
@@ -222,12 +251,17 @@ def retrieval_relevance_threshold():
 def get_database_path():
     """
     Returns the active database path based on MRL setting.
-    MRL enabled: returns 'backend/database/mrl/'
-    MRL disabled: returns 'backend/database/full/'
+    MRL enabled: returns absolute path to 'backend/database/mrl/'
+    MRL disabled: returns absolute path to 'backend/database/full/'
+    ACTIVE_DATABASE=dockling_mrl: returns 'backend/dockling/database/mrl/'
     """
+    active_db = get_active_database()
+    if active_db == "dockling_mrl":
+        return os.path.join(BACKEND_DIR, "dockling", "database", "mrl")
+
     if is_mrl_enabled():
-        return "backend/database/mrl"
-    return "backend/database/full"
+        return os.path.join(BACKEND_DIR, "database", "mrl")
+    return os.path.join(BACKEND_DIR, "database", "full")
 
 
 def build_raw_query_payload(user_query):
@@ -258,5 +292,6 @@ def public_settings():
     return {
         "enable_rag": data["enable_rag"],
         "enable_laqa": data["enable_laqa"],
-        "enable_mrl": data["enable_mrl"]
+        "enable_mrl": data["enable_mrl"],
+        "active_database": data.get("active_database", "mrl")
     }

@@ -25,6 +25,15 @@ from metrics import *
 # 🔹 LOAD DATASET
 # =========================================================
 def load_dataset(path):
+    if not os.path.exists(path):
+        # Try resolving relative to BACKEND_DIR
+        alt_path = os.path.join(settings.BACKEND_DIR, os.path.basename(os.path.dirname(path)), os.path.basename(path))
+        if os.path.exists(alt_path):
+            path = alt_path
+        elif path.startswith("backend/"):
+            alt_path2 = os.path.join(settings.BACKEND_DIR, path[len("backend/"):])
+            if os.path.exists(alt_path2):
+                path = alt_path2
 
     with open(
         path,
@@ -731,6 +740,11 @@ def evaluate(dataset_path):
             []
         ) or contexts
 
+        candidate_docs = result.get(
+            "candidate_texts",
+            []
+        ) or context_docs
+
         print(
             "EVALUATOR RECEIVED DOCS:",
             len(context_docs)
@@ -859,7 +873,7 @@ def evaluate(dataset_path):
                     context_docs,
                     q,
                     5,
-                    context_docs
+                    candidate_docs
                 ),
 
                 "mrr": executor.submit(

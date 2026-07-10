@@ -289,6 +289,12 @@ PREDICTION:
         parsed = json.loads(match.group(0))
 
         judge_score = float(parsed.get("llm_judge_score", 0))
+        # Scale score if model output is on 1-5 or 1-10 range
+        if judge_score > 5.0:
+            judge_score = judge_score / 10.0
+        elif judge_score > 1.0:
+            judge_score = judge_score / 5.0
+
         safety = float(parsed.get("scope_safety", 0))
         completeness = float(parsed.get("scope_completeness", 0))
         originality = float(parsed.get("scope_originality", 0))

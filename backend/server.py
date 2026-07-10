@@ -362,7 +362,9 @@ def update_runtime_settings():
 
         "enable_laqa": updated["enable_laqa"],
 
-        "enable_mrl": updated["enable_mrl"]
+        "enable_mrl": updated["enable_mrl"],
+
+        "active_database": updated.get("active_database", "mrl")
     })
 
 

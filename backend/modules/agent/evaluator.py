@@ -571,6 +571,7 @@ STRICT RULES:
 - Penalize vague, incomplete, or off-target answers
 - Do not assume retrieval or context
 - Do not use grounding-based judgments
+- Evaluate 'score' as an integer from 1 to 10 rating the overall quality and medical correctness of the answer (10 is perfect, 1 is completely wrong/empty/refusal)
 
 Return ONLY valid JSON.
 
@@ -942,6 +943,7 @@ STRICT RULES:
 - Require direct answers early
 - High confidence requires strong grounding
 - Evaluate contradiction_risk as a float from 0.0 (no contradiction) to 1.0 (direct contradiction with context)
+- Evaluate 'score' as an integer from 1 to 10 rating the overall quality and medical correctness of the answer based on the context (10 is perfect, 1 is completely wrong/empty/refusal)
 
 Return ONLY valid JSON.
 

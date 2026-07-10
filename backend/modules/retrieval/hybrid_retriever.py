@@ -26,8 +26,8 @@ def migrate_legacy_database():
     If old single database exists at backend/database/vector_store/,
     migrate it to the new structure (mrl/ or full/).
     """
-    legacy_path = "backend/database/vector_store"
-    metadata_path = f"{legacy_path}/metadata.json"
+    legacy_path = os.path.join(settings.BACKEND_DIR, "database", "vector_store")
+    metadata_path = os.path.join(legacy_path, "metadata.json")
 
     if not os.path.exists(legacy_path):
         return
@@ -50,7 +50,7 @@ def migrate_legacy_database():
     # Infer MRL mode from dimension
     if dimension == 512:
         was_mrl = True
-    elif dimension == 768:
+    elif dimension in (256, 768):
         was_mrl = False
     else:
         print(f"⚠️  Legacy database has unknown dimension {dimension}, skipping migration")
@@ -58,7 +58,7 @@ def migrate_legacy_database():
 
     # Determine target directory
     target_db = "mrl" if was_mrl else "full"
-    target_path = f"backend/database/{target_db}"
+    target_path = os.path.join(settings.BACKEND_DIR, "database", target_db)
 
     # Check if target already exists
     if os.path.exists(target_path):
@@ -1292,5 +1292,7 @@ def hybrid_search(
 
         "query_metadata": query_metadata,
 
-        "retrieval_diagnostics": retrieval_diagnostics
+        "retrieval_diagnostics": retrieval_diagnostics,
+
+        "candidate_texts": candidate_texts
     }

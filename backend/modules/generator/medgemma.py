@@ -576,7 +576,7 @@ def clean_direct_output(answer):
 # =========================================================
 def validate_answer(answer):
 
-    if len(answer.strip()) < 8:
+    if len(answer.strip()) < 2:
         return False
 
     severe_patterns = [

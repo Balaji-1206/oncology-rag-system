@@ -100,7 +100,8 @@ def clean_query(text):
     }
 
     for wrong, correct in fixes.items():
-        text = text.replace(wrong, correct)
+        pattern = r'\b' + re.escape(wrong) + r'\b'
+        text = re.sub(pattern, correct, text, flags=re.IGNORECASE)
 
     words = text.split()
 
