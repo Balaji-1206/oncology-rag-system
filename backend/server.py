@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+import os
 import time
 import traceback
 import settings
@@ -12,7 +13,20 @@ from app import handle_query
 # =========================================================
 app = Flask(__name__)
 
-CORS(app)
+# Restrict CORS to known origins.
+# Set CORS_ORIGINS env var (comma-separated) to override in production.
+_cors_origins_env = os.environ.get("CORS_ORIGINS", "")
+if _cors_origins_env:
+    _allowed_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+else:
+    _allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5000",
+    ]
+
+CORS(app, origins=_allowed_origins)
 
 SERVER_START_TIME = time.time()
 
@@ -501,11 +515,15 @@ if __name__ == "__main__":
         "on http://localhost:5000"
     )
 
+    # Use FLASK_DEBUG=true env var to enable debug mode.
+    # Never enable debug=True in any shared/deployed environment.
+    _debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+
     app.run(
 
         host="0.0.0.0",
 
         port=5000,
 
-        debug=True
+        debug=_debug
     )

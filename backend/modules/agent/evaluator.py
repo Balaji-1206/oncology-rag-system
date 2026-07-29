@@ -11,6 +11,8 @@ from modules.embeddings.mrl_embeddings import (
     get_mrl_embedding
 )
 
+SESSION = requests.Session()
+
 PHI3MINI_URL = "http://localhost:11434/api/generate"
 
 EVAL_MODEL = "phi3:mini"
@@ -222,7 +224,7 @@ def safe_float(v, default=0.5):
     try:
         return float(v)
 
-    except:
+    except Exception:
         return default
 
 
@@ -231,7 +233,7 @@ def safe_int(v, default=5):
     try:
         return int(v)
 
-    except:
+    except Exception:
         return default
 
 
@@ -614,7 +616,7 @@ def evaluate_answer(
 
         try:
 
-            response = requests.post(
+            response = SESSION.post(
                 PHI3MINI_URL,
                 json={
 
@@ -653,7 +655,7 @@ def evaluate_answer(
                 ""
             ).strip()
 
-            print("\n🧠 EVAL RAW OUTPUT:\n")
+            print("\n[EVAL] RAW OUTPUT:\n")
             print(raw_output)
 
             parsed = extract_json(
@@ -972,7 +974,7 @@ ANSWER:
 
     try:
 
-        response = requests.post(
+        response = SESSION.post(
             PHI3MINI_URL,
             json={
 
@@ -1011,7 +1013,7 @@ ANSWER:
             ""
         ).strip()
 
-        print("\n🧠 EVAL RAW OUTPUT:\n")
+        print("\n[EVAL] RAW OUTPUT:\n")
         print(raw_output)
 
         parsed = extract_json(
@@ -1291,9 +1293,12 @@ ANSWER:
             confidence = 0.80
 
         # =====================================================
-        # 🔹 RETRIEVAL SCORE
+        # 🔹 INTERNAL RETRIEVAL QUALITY ESTIMATE
+        # NOTE: This is an evaluator-side estimate.
+        # The real FAISS/BM25 retrieval_score is set by agent_controller.py
+        # and will replace this value in eval_result["retrieval_score"].
         # =====================================================
-        retrieval_score = (
+        _eval_retrieval_score = (
 
             0.55 * grounding
 
@@ -1306,11 +1311,11 @@ ANSWER:
             0.20 * confidence
         )
 
-        retrieval_score = max(
+        _eval_retrieval_score = max(
             0.0,
             min(
                 1.0,
-                retrieval_score
+                _eval_retrieval_score
             )
         )
 
@@ -1345,7 +1350,7 @@ ANSWER:
             ),
 
             "retrieval_score": round(
-                retrieval_score,
+                _eval_retrieval_score,
                 2
             ),
 

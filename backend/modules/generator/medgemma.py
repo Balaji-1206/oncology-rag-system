@@ -1,13 +1,18 @@
 import requests
 import re
+import os
 import settings
 
 SESSION = requests.Session()
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-#MODEL = "hf.co/QuantFactory/Llama3-Med42-8B-GGUF:Q4_K_M" 
-MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q4_K_M"
+# Model is configurable via OLLAMA_MODEL env variable.
+# Default: medgemma-1.5-4b-it Q4_K_M quantisation.
+MODEL = os.environ.get(
+    "OLLAMA_MODEL",
+    "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q4_K_M"
+)
 
 
 # =========================================================
@@ -828,7 +833,7 @@ def build_generation_options(query_type="general"):
 
         "num_predict": num_predict,
 
-        "num_ctx": 2048,
+        "num_ctx": 4096,
 
         "num_thread": 8,
 
@@ -892,7 +897,7 @@ def build_direct_generation_options(query_type="general"):
 
         "num_predict": num_predict,
 
-        "num_ctx": 2048,
+        "num_ctx": 4096,
 
         "num_thread": 8,
 
@@ -984,7 +989,7 @@ def generate_answer(agent_output):
         )
         # print(repr(raw_answer))
         
-        print("\n🧠 RAW GENERATER ANSWER:")
+        print("\n[GENERATOR] RAW ANSWER:")
         print(raw_answer)
 
         if settings.is_rag_enabled():

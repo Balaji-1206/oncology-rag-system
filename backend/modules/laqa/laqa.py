@@ -87,11 +87,22 @@ def clean_query(text):
         "ct": "chemotherapy",
         "io": "immunotherapy",
 
-        # Oncology abbreviations
+        # Oncology abbreviations & synonyms
         "os": "overall survival",
         "dfs": "disease free survival",
         "pfs": "progression free survival",
         "orr": "objective response rate",
+        "crc": "colorectal cancer",
+        "rcc": "renal cell carcinoma",
+        "hcc": "hepatocellular carcinoma",
+        "tnbc": "triple negative breast cancer",
+        "gist": "gastrointestinal stromal tumor",
+        "pdl1": "pd-l1",
+        "pd1": "pd-1",
+        "ctla4": "ctla-4",
+        "keytruda": "pembrolizumab",
+        "opdivo": "nivolumab",
+        "herceptin": "trastuzumab",
 
         # Diagnostic abbreviations
         "mri": "magnetic resonance imaging",
@@ -102,17 +113,6 @@ def clean_query(text):
     for wrong, correct in fixes.items():
         pattern = r'\b' + re.escape(wrong) + r'\b'
         text = re.sub(pattern, correct, text, flags=re.IGNORECASE)
-
-    words = text.split()
-
-    normalized = []
-
-    for word in words:
-        normalized.append(
-            fixes.get(word, word)
-        )
-
-    text = " ".join(normalized)
 
     return text.strip()
 
@@ -259,34 +259,37 @@ def detect_query_type(query):
         ]
     }
 
-    # Highest priority checks
+    # Highest priority structural checks
     for query_type in [
         "comparison",
         "ranking",
-        "list",
-        "definition"
+        "list"
     ]:
-
         for p in patterns[query_type]:
-
             if p in q:
                 return query_type
 
-    # Domain-specific checks
-    for query_type, keywords in patterns.items():
-
-        if query_type in {
-            "comparison",
-            "ranking",
-            "list",
-            "definition"
-        }:
-            continue
-
-        for kw in keywords:
-
+    # Domain-specific clinical checks (take precedence over generic 'definition')
+    for query_type in [
+        "symptoms",
+        "diagnosis",
+        "treatment",
+        "side_effects",
+        "prognosis",
+        "staging",
+        "prevention",
+        "risk_factors",
+        "clinical_trials",
+        "epidemiology"
+    ]:
+        for kw in patterns[query_type]:
             if kw in q:
                 return query_type
+
+    # Generic definition check (matches 'what is', 'define', etc. if no specific domain matched)
+    for p in patterns["definition"]:
+        if p in q:
+            return "definition"
 
     yesno_starters = (
         "is",
@@ -377,10 +380,9 @@ def is_simple_query(query):
 
 
 # =========================================================
+# =========================================================
 # 🔹 DETERMINISTIC EXPANSION
 # =========================================================
-import re
-
 def deterministic_expansion(
     query,
     query_type
@@ -755,7 +757,7 @@ QUERY:
         if len(text) > 5:
             return text
 
-    except:
+    except Exception:
         pass
 
     return query
@@ -947,29 +949,65 @@ def domain_safe_expansion(
         "tumour",
         "oncology",
 
+        "breast",
+        "lung",
+        "colon",
+        "rectal",
+        "colorectal",
+        "prostate",
+        "ovarian",
+        "cervical",
+        "renal",
+        "kidney",
+        "pancreatic",
+        "liver",
+        "gastric",
+        "stomach",
+        "thyroid",
+        "brain",
+        "bladder",
+        "esophageal",
+
         "chemotherapy",
         "immunotherapy",
         "radiotherapy",
+        "radiation",
+        "surgery",
+        "resection",
+        "hormone",
+        "endocrine",
+        "targeted",
 
         "diagnosis",
         "symptoms",
+        "biopsy",
+        "imaging",
+        "screening",
 
         "treatment",
         "therapy",
+        "management",
 
         "prognosis",
         "survival",
+        "outcome",
+        "mortality",
+        "recurrence",
 
         "metastasis",
         "metastatic",
 
         "staging",
+        "stage",
+        "tnm",
 
         "carcinoma",
         "sarcoma",
         "lymphoma",
         "leukemia",
         "melanoma",
+        "myeloma",
+        "gist",
 
         "clinical",
         "trial",
@@ -977,8 +1015,8 @@ def domain_safe_expansion(
         "toxicity",
         "adverse",
         "effects",
+        "complications",
 
-        "screening",
         "prevention",
 
         "egfr",
@@ -986,7 +1024,9 @@ def domain_safe_expansion(
         "her2",
         "braf",
         "pd-l1",
-        "car-t"
+        "pd-1",
+        "car-t",
+        "brca"
     }
 
     has_medical_signal = any(
@@ -1129,7 +1169,7 @@ def process_query(query):
     # ------------------------------------
     # DEBUG
     # ------------------------------------
-    print("\n🧠 LAQA PARSED:")
+    print("\n[LAQA] PARSED:")
 
     print(
         json.dumps(

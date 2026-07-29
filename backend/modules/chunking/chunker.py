@@ -1,5 +1,6 @@
 import os
 import re
+import hashlib
 from PyPDF2 import PdfReader
 
 from utils.metadata_tools import (
@@ -10,6 +11,32 @@ from utils.metadata_tools import (
 # =========================================================
 # 🔹 LOAD PDFS
 # =========================================================
+from concurrent.futures import ThreadPoolExecutor
+
+def _load_single_pdf(args):
+    folder_path, file = args
+    path = os.path.join(folder_path, file)
+    try:
+        reader = PdfReader(path)
+        text = ""
+
+        for page in reader.pages:
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
+
+        text = text.strip()
+
+        if len(text) < 500:
+            print(f"[PDF] Skipping weak PDF: {file}")
+            return None
+
+        return {"id": file, "text": text}
+
+    except Exception as e:
+        print(f"[PDF] Failed loading {file}:", e)
+        return None
+
 def load_pdfs(folder_path, limit=None):
 
     documents = []
@@ -19,32 +46,17 @@ def load_pdfs(folder_path, limit=None):
     if limit is not None:
         pdf_files = pdf_files[:limit]
 
-    print(f"📄 PDFs selected: {len(pdf_files)}")
+    print(f"[PDF] PDFs selected: {len(pdf_files)}")
 
-    for file in pdf_files:
+    max_workers = min(8, os.cpu_count() or 4)
+    tasks = [(folder_path, f) for f in pdf_files]
 
-        path = os.path.join(folder_path, file)
-        print(f"📥 Loading: {file}")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(_load_single_pdf, tasks))
 
-        try:
-            reader = PdfReader(path)
-            text = ""
-
-            for page in reader.pages:
-                extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
-
-            text = text.strip()
-
-            if len(text) < 500:
-                print(f"⚠️ Skipping weak PDF: {file}")
-                continue
-
-            documents.append({"id": file, "text": text})
-
-        except Exception as e:
-            print(f"❌ Failed loading {file}:", e)
+    for res in results:
+        if res is not None:
+            documents.append(res)
 
     return documents
 
@@ -54,6 +66,8 @@ def load_pdfs(folder_path, limit=None):
 # =========================================================
 def clean_text(text):
 
+    # Fix broken line-wrap hyphens (e.g. "immuno-\ntherapy" -> "immunotherapy")
+    text = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", text)
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"[-=_]{2,}", " ", text)
     text = re.sub(r"[^\x00-\x7F]+", " ", text)
@@ -199,7 +213,9 @@ def detect_section(text):
     for section, keywords in sections.items():
         score = 0
         for kw in keywords:
-            if kw in text_lower:
+            # Word-boundary matching prevents partial substring false positives
+            # e.g., 'significant' matching 'sign' in symptoms
+            if re.search(r"\b" + re.escape(kw) + r"\b", text_lower):
                 score += 1
         if score > 0:
             scores[section] = score
@@ -246,8 +262,11 @@ def is_good_chunk(text):
         if p in text_lower:
             return False
 
-    alpha_ratio = sum(c.isalpha() for c in text) / max(len(text), 1)
-    if alpha_ratio < 0.55:
+    # Check valid character ratio (letters, numbers, spaces, medical punctuation)
+    # This protects dense clinical trial data tables and dosage specifications from false rejection
+    valid_chars = sum(c.isalnum() or c.isspace() or c in ".,-()/%[]" for c in text)
+    valid_ratio = valid_chars / max(len(text), 1)
+    if valid_ratio < 0.70:
         return False
 
     return True
@@ -275,7 +294,7 @@ def split_sentences(text):
 # =========================================================
 def fallback_chunk(text, max_chunk_words=320, overlap_sentences=2):
 
-    print("🧩 Creating semantic chunks...")
+    print(" Creating semantic chunks...")
 
     sentences = split_sentences(text)
     chunks = []
@@ -306,7 +325,7 @@ def fallback_chunk(text, max_chunk_words=320, overlap_sentences=2):
     if current:
         chunks.append(" ".join(current))
 
-    print(f"✅ Semantic chunks created: {len(chunks)}")
+    print(f" Semantic chunks created: {len(chunks)}")
     return chunks
 
 
@@ -315,14 +334,14 @@ def fallback_chunk(text, max_chunk_words=320, overlap_sentences=2):
 # =========================================================
 def deduplicate_chunks(chunks):
 
-    print("🔹 Deduplicating chunks...")
+    print(" Deduplicating chunks...")
 
     unique = []
     seen_hashes = set()
 
     for chunk in chunks:
         text = chunk["text"]
-        key = hash(text[:300].lower())
+        key = hashlib.md5(text[:300].lower().encode("utf-8")).hexdigest()
 
         if key in seen_hashes:
             continue
@@ -330,7 +349,7 @@ def deduplicate_chunks(chunks):
         seen_hashes.add(key)
         unique.append(chunk)
 
-    print(f"✅ Chunks after deduplication: {len(unique)}")
+    print(f" Chunks after deduplication: {len(unique)}")
     return unique
 
 
@@ -348,10 +367,10 @@ def chunk_text(documents):
         file_id = doc["id"]
         text = clean_text(doc["text"])
 
-        print(f"\n📄 Processing {i+1}/{len(documents)}: {file_id}")
+        print(f"\n Processing {i+1}/{len(documents)}: {file_id}")
 
         chunks = fallback_chunk(text)
-        print(f"📦 Candidate chunks: {len(chunks)}")
+        print(f" Candidate chunks: {len(chunks)}")
 
         kept = 0
 
@@ -393,11 +412,11 @@ def chunk_text(documents):
             chunk_counter += 1
             kept += 1
 
-        print(f"✅ Valid chunks kept: {kept}")
+        print(f" Valid chunks kept: {kept}")
 
     final_chunks = deduplicate_chunks(final_chunks)
 
-    print("\n🔍 SAMPLE CHUNKS:\n")
+    print("\n SAMPLE CHUNKS:\n")
     for c in final_chunks[:3]:
         print(c)
         print()
@@ -407,6 +426,6 @@ def chunk_text(documents):
     print("LLM metadata calls: 0")
     print("LLM usage rate: 0.00%")
 
-    print(f"\n✅ Total cleaned chunks: {len(final_chunks)}")
+    print(f"\n Total cleaned chunks: {len(final_chunks)}")
 
     return final_chunks

@@ -15,6 +15,7 @@ import settings
 _model = None
 _embedding_cache = {}
 _cache_lock = Lock()
+MAX_CACHE_SIZE = 10000
 
 MRL_MODEL_NAME = "nomic-ai/nomic-embed-text-v1.5"
 
@@ -36,9 +37,12 @@ def get_model():
             "TOKENIZERS_PARALLELISM"
         ] = "false"
 
+        import torch
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
+
         _model = SentenceTransformer(
             MRL_MODEL_NAME,
-            device="cuda",
+            device=_device,
             trust_remote_code=True
         )
 
@@ -131,7 +135,7 @@ def get_mrl_embedding(
 
         encoded = model.encode(
             missing,
-            batch_size=16,
+            batch_size=64,
             show_progress_bar=show_progress_bar,
             convert_to_numpy=True,
             normalize_embeddings=True
@@ -145,6 +149,11 @@ def get_mrl_embedding(
             )
 
         encoded = encoded[:, :requested_dim]
+
+        # Re-normalize vector after slicing to guarantee exact unit L2 length for MRL dot-product
+        norms = np.linalg.norm(encoded, axis=1, keepdims=True)
+        norms[norms == 0] = 1.0
+        encoded = encoded / norms
 
         encoded = np.array(
             encoded,
@@ -164,6 +173,11 @@ def get_mrl_embedding(
                         requested_dim,
                         key[1]
                     )
+
+                    # Evict oldest entry if cache capacity reached
+                    if len(_embedding_cache) >= MAX_CACHE_SIZE:
+                        first_key = next(iter(_embedding_cache))
+                        _embedding_cache.pop(first_key, None)
 
                     _embedding_cache[key] = vector
 

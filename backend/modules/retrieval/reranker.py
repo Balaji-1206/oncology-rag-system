@@ -1,15 +1,18 @@
 from sentence_transformers import CrossEncoder
 import numpy as np
 import re
+import torch
 
 # =========================================================
 # 🔹 LOAD ONCE
 # =========================================================
 print("🔥 Loading reranker model ONCE...")
 
+_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 reranker = CrossEncoder(
     "BAAI/bge-reranker-large",
-    device="cuda"
+    device=_DEVICE
 )
 
 
@@ -136,34 +139,33 @@ def definition_boost(
 # =========================================================
 # 🔹 NOISE PENALTY
 # =========================================================
-def noise_penalty(doc):
+_STAT_NOISE_PATTERNS = [
+    "confidence interval",
+    "statistically significant",
+    "study population",
+    "retrospective study",
+    "prospective study",
+    "p-value",
+    "hazard ratio",
+    "prevalence",
+    "incidence"
+]
 
-    bad_patterns = [
+_EPIDEMIOLOGY_QUERY_TYPES = {
+    "epidemiology", "clinical_trials", "prognosis", "ranking"
+}
 
-        "confidence interval",
+def noise_penalty(doc, query_type=None):
 
-        "statistically significant",
-
-        "study population",
-
-        "retrospective study",
-
-        "prospective study",
-
-        "p-value",
-
-        "hazard ratio",
-
-        "prevalence",
-
-        "incidence"
-    ]
+    # Skip penalty for query types where statistical terms are content
+    if query_type in _EPIDEMIOLOGY_QUERY_TYPES:
+        return 0.0
 
     text = doc.lower()
 
     penalty = 0.0
 
-    for p in bad_patterns:
+    for p in _STAT_NOISE_PATTERNS:
 
         if p in text:
             penalty += 0.08
@@ -225,7 +227,8 @@ def rerank(
     query,
     docs,
     top_k=5,
-    return_scores=False
+    return_scores=False,
+    query_type=None
 ):
 
     if not docs:
@@ -284,7 +287,7 @@ def rerank(
 
         penalty = (
 
-            noise_penalty(doc)
+            noise_penalty(doc, query_type=query_type)
 
             +
 

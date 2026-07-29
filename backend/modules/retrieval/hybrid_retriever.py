@@ -8,6 +8,7 @@ import settings
 import os
 import shutil
 from datetime import datetime
+from threading import Lock
 from modules.retrieval.reranker import rerank
 from modules.embeddings.mrl_embeddings import (
     get_dynamic_mrl_embedding
@@ -44,7 +45,7 @@ def migrate_legacy_database():
     try:
         legacy_index = faiss.read_index(legacy_faiss_path)
         dimension = legacy_index.d
-    except:
+    except Exception:
         return
 
     # Infer MRL mode from dimension
@@ -197,6 +198,9 @@ _CACHE = {
     "chunk_metadata": None
 }
 
+# Protects _CACHE from concurrent request corruption
+_CACHE_LOCK = Lock()
+
 def _reload_all_indexes(verbose=False):
     """Internal: reload all indexes from disk. Called only when db path changes."""
     db_path = settings.get_database_path()
@@ -241,50 +245,48 @@ def _reload_all_indexes(verbose=False):
 def get_index():
     """Get FAISS index, reloading only if database path changed."""
     db_path = settings.get_database_path()
-
-    if _CACHE["current_db_path"] != db_path:
-        _reload_all_indexes(verbose=True)
-
-    return _CACHE["faiss_index"]
+    with _CACHE_LOCK:
+        if _CACHE["current_db_path"] != db_path:
+            _reload_all_indexes(verbose=True)
+        return _CACHE["faiss_index"]
 
 def get_bm25():
     """Get BM25 index, reloading only if database path changed."""
     db_path = settings.get_database_path()
-
-    if _CACHE["current_db_path"] != db_path:
-        _reload_all_indexes(verbose=True)
-
-    return _CACHE["bm25"]
+    with _CACHE_LOCK:
+        if _CACHE["current_db_path"] != db_path:
+            _reload_all_indexes(verbose=True)
+        return _CACHE["bm25"]
 
 def get_ids():
     """Get document IDs, reloading only if database path changed."""
     db_path = settings.get_database_path()
-
-    if _CACHE["current_db_path"] != db_path:
-        _reload_all_indexes(verbose=True)
-
-    return _CACHE["ids"]
+    with _CACHE_LOCK:
+        if _CACHE["current_db_path"] != db_path:
+            _reload_all_indexes(verbose=True)
+        return _CACHE["ids"]
 
 def get_id_to_text():
     """Get document text map, reloading only if database path changed."""
     db_path = settings.get_database_path()
-
-    if _CACHE["current_db_path"] != db_path:
-        _reload_all_indexes(verbose=True)
-
-    return _CACHE["id_to_text"]
+    with _CACHE_LOCK:
+        if _CACHE["current_db_path"] != db_path:
+            _reload_all_indexes(verbose=True)
+        return _CACHE["id_to_text"]
 
 def get_chunk_metadata():
     """Get chunk metadata, reloading only if database path changed."""
     db_path = settings.get_database_path()
+    with _CACHE_LOCK:
+        if _CACHE["current_db_path"] != db_path:
+            _reload_all_indexes(verbose=True)
+        return _CACHE["chunk_metadata"]
 
-    if _CACHE["current_db_path"] != db_path:
-        _reload_all_indexes(verbose=True)
-
-    return _CACHE["chunk_metadata"]
-
-# Load once at module import
-_reload_all_indexes()
+# Try load once at module import (fails gracefully if index not built yet)
+try:
+    _reload_all_indexes()
+except Exception:
+    pass
 
 
 # =========================================================
@@ -308,22 +310,8 @@ def tokenize(text):
 # =========================================================
 # 🔹 NORMALIZATION
 # =========================================================
-def normalize_scores(scores):
-
-    scores = np.array(
-        scores,
-        dtype=np.float32
-    )
-
-    if len(scores) == 0:
-        return scores
-
-    std = scores.std()
-
-    if std == 0:
-        return np.zeros_like(scores)
-
-    return (scores - scores.mean()) / std
+# Note: normalize_scores (z-score) was removed — it returned negative values
+# and was never called. Use normalize_unit_scores (min-max, 0–1) instead.
 
 
 def normalize_unit_scores(scores):
@@ -617,34 +605,36 @@ def educational_boost(
 # =========================================================
 # 🔹 NOISE PENALTY
 # =========================================================
-def noise_penalty(text):
+# Statistical/methodological terms are penalized for most query types,
+# but NOT for epidemiology/clinical_trials/prognosis queries where
+# terms like 'prevalence', 'incidence', 'p-value' are relevant.
+_STAT_NOISE_PATTERNS = [
+    "confidence interval",
+    "statistically significant",
+    "p-value",
+    "prevalence",
+    "incidence",
+    "study population",
+    "adult population",
+    "retrospective study",
+    "prospective study"
+]
 
-    bad_patterns = [
+_EPIDEMIOLOGY_QUERY_TYPES = {
+    "epidemiology", "clinical_trials", "prognosis", "ranking"
+}
 
-        "confidence interval",
+def noise_penalty(text, query_type=None):
 
-        "statistically significant",
-
-        "p-value",
-
-        "prevalence",
-
-        "incidence",
-
-        "study population",
-
-        "adult population",
-
-        "retrospective study",
-
-        "prospective study"
-    ]
+    # Skip penalty entirely for query types where stats ARE the content
+    if query_type in _EPIDEMIOLOGY_QUERY_TYPES:
+        return 0.0
 
     text_lower = text.lower()
 
     penalty = 0.0
 
-    for p in bad_patterns:
+    for p in _STAT_NOISE_PATTERNS:
 
         if p in text_lower:
             penalty += 0.08
@@ -996,7 +986,8 @@ def hybrid_search(
         )
 
         doc_score_map[doc_id] -= noise_penalty(
-            text
+            text,
+            query_type=query_type
         )
 
     semantic_scores_raw = {
@@ -1044,7 +1035,8 @@ def hybrid_search(
         query=query,
         docs=candidate_texts,
         top_k=10,
-        return_scores=True
+        return_scores=True,
+        query_type=query_type
     )
 
     reranker_score_map = {}
@@ -1111,14 +1103,12 @@ def hybrid_search(
             )
         )
 
+        # reranker_score_map already stores calibrated confidence (0.0 to 1.0)
+        # Re-applying sigmoid here was squashing all scores into a compressed [0.51, 0.72] range
         reranker_score = float(
-            1 / (
-                1 + np.exp(
-                    -reranker_score_map.get(
-                        doc_id,
-                        0.0
-                    )
-                )
+            reranker_score_map.get(
+                doc_id,
+                0.0
             )
         )
 

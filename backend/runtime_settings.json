@@ -1,8 +1,9 @@
 {
+  "active_database": "mrl",
   "enable_laqa": true,
   "enable_mrl": true,
   "enable_rag": true,
-  "full_embedding_dimension": 256,
+  "full_embedding_dimension": 768,
   "mrl_dimension": 512,
   "retrieval_relevance_threshold": 0.65
 }

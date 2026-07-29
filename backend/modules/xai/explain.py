@@ -191,7 +191,7 @@ def extract_supporting_sentences(
 
                 "et al",
 
-                "study",
+                "study design",
 
                 "prevalence",
 

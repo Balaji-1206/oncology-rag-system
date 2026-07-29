@@ -17,8 +17,17 @@ ENABLE_MRL = False
 ENABLE_RAG = True
 
 MRL_DIMENSION = 512
-FULL_EMBEDDING_DIMENSION = 256
+# nomic-ai/nomic-embed-text-v1.5 produces 768 dims at full resolution.
+# 256 was incorrect and silently truncated embeddings in full (non-MRL) mode.
+FULL_EMBEDDING_DIMENSION = 768
 RETRIEVAL_RELEVANCE_THRESHOLD = 0.65
+
+# =========================================================
+# MODULE-LEVEL SETTINGS CACHE
+# Avoids repeated disk reads on every is_rag_enabled() call.
+# Invalidated on update_settings().
+# =========================================================
+_settings_cache = None
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -145,11 +154,15 @@ def save_settings(data):
 
 
 def get_settings():
-
-    return load_settings()
+    """Return cached settings, loading from disk only once per change."""
+    global _settings_cache
+    if _settings_cache is None:
+        _settings_cache = load_settings()
+    return _settings_cache
 
 
 def update_settings(payload):
+    global _settings_cache
 
     current = load_settings()
 
@@ -191,20 +204,23 @@ def update_settings(payload):
 
     save_settings(current)
 
+    # Invalidate cache so next call reflects the new values
+    _settings_cache = None
+
     return current
 
 
 def is_laqa_enabled():
 
     return bool(
-        load_settings()["enable_laqa"]
+        get_settings()["enable_laqa"]
     )
 
 
 def is_rag_enabled():
 
     return bool(
-        load_settings()["enable_rag"]
+        get_settings()["enable_rag"]
     )
 
 
@@ -213,7 +229,7 @@ def get_active_database():
     env_val = os.environ.get("ACTIVE_DATABASE")
     if env_val:
         return env_val
-    return load_settings().get("active_database", "mrl")
+    return get_settings().get("active_database", "mrl")
 
 
 def is_mrl_enabled():
@@ -223,7 +239,7 @@ def is_mrl_enabled():
         return True
 
     return bool(
-        load_settings()["enable_mrl"]
+        get_settings()["enable_mrl"]
     )
 
 
@@ -233,7 +249,7 @@ def effective_embedding_dimension():
     if active_db == "dockling_mrl":
         return 512
 
-    data = load_settings()
+    data = get_settings()
 
     if data["enable_mrl"]:
         return int(data["mrl_dimension"])
@@ -244,7 +260,7 @@ def effective_embedding_dimension():
 def retrieval_relevance_threshold():
 
     return float(
-        load_settings()["retrieval_relevance_threshold"]
+        get_settings()["retrieval_relevance_threshold"]
     )
 
 
@@ -287,7 +303,7 @@ def build_raw_query_payload(user_query):
 
 def public_settings():
 
-    data = load_settings()
+    data = get_settings()
 
     return {
         "enable_rag": data["enable_rag"],

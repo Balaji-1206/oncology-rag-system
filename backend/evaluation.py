@@ -18,7 +18,26 @@ import app as app_module
 from app import handle_query
 from modules.agent import agent_controller as agent_controller_module
 
-from metrics import *
+from metrics import (
+    prepare_metric_embeddings,
+    compute_bleu_scores,
+    compute_gleu_score,
+    compute_distinct_scores,
+    compute_accuracy_f1,
+    compute_rouge_scores,
+    compute_bertscore,
+    compute_meteor_score,
+    compute_sbert_similarity,
+    combined_llm_evaluation,
+    precision_at_k,
+    recall_at_k,
+    mrr,
+    hit_rate,
+    ndcg,
+    compute_faithfulness,
+    answer_relevance,
+    context_relevance,
+)
 
 
 # =========================================================

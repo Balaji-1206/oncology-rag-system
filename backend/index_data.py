@@ -5,8 +5,7 @@ import os
 import re
 import json
 import sys
-from datetime import datetime
-
+from datetime import datetime, timezone
 from rank_bm25 import BM25Okapi
 
 import settings
@@ -38,8 +37,8 @@ os.makedirs(os.path.join(settings.BACKEND_DIR, "database"), exist_ok=True)
 # Create target database directory
 os.makedirs(SAVE_PATH, exist_ok=True)
 
-print(f"📦 Target database: {SAVE_PATH}")
-print(f"📦 MRL mode: {'ENABLED' if settings.is_mrl_enabled() else 'DISABLED'}")
+print(f"[DATABASE] Target database: {SAVE_PATH}")
+print(f"[DATABASE] MRL mode: {'ENABLED' if settings.is_mrl_enabled() else 'DISABLED'}")
 
 
 # =========================================================
@@ -83,24 +82,29 @@ def deduplicate_documents(documents):
 # =========================================================
 # 🔹 LOAD PDFS
 # =========================================================
-print("🔹 Loading PDFs...")
+print(" Loading PDFs...")
 # =========================================================
 # 🔹 NUMBER OF PDFs TO INDEX
+# Configurable via PDF_LIMIT environment variable. Default: 25.
+# Set PDF_LIMIT=0 to index all available PDFs.
 # =========================================================
-PDF_LIMIT = 25
+env_limit = os.environ.get("PDF_LIMIT")
+PDF_LIMIT = int(env_limit) if env_limit and env_limit.isdigit() else 25
+if PDF_LIMIT == 0:
+    PDF_LIMIT = None
 
 raw_docs = load_pdfs(
     DATA_PATH,
     limit=PDF_LIMIT
 )
 
-print(f"📄 PDFs loaded: {len(raw_docs)}")
+print(f" PDFs loaded: {len(raw_docs)}")
 
 
 # =========================================================
 # 🔹 CHUNKING
 # =========================================================
-print("🔹 Chunking...")
+print(" Chunking...")
 
 documents = chunk_text(raw_docs)
 
@@ -160,12 +164,12 @@ for doc in documents:
         fallback_id=doc_id
     )
 
-print(f"📚 Total chunks: {len(texts)}")
+print(f" Total chunks: {len(texts)}")
 
 # =========================================================
 # 🔹 EMBEDDINGS
 # =========================================================
-print("🔹 Creating MRL embeddings...")
+print(" Creating MRL embeddings...")
 
 embedding_dimension = settings.effective_embedding_dimension()
 
@@ -218,7 +222,7 @@ if dimension != embedding_dimension:
 # =========================================================
 # 🔹 FAISS
 # =========================================================
-print("🔹 Building FAISS index...")
+print(" Building FAISS index...")
 
 index = faiss.IndexFlatIP(
     dimension
@@ -233,7 +237,7 @@ print(
 # =========================================================
 # 🔹 BM25
 # =========================================================
-print("🔹 Building BM25...")
+print(" Building BM25...")
 
 tokenized_docs = [
 
@@ -249,7 +253,7 @@ bm25 = BM25Okapi(
 # =========================================================
 # 🔹 SAVE FAISS
 # =========================================================
-print("💾 Saving FAISS index...")
+print(" Saving FAISS index...")
 
 faiss_index_path = f"{SAVE_PATH}/faiss.index"
 
@@ -396,7 +400,7 @@ metadata = {
     "mrl_enabled": settings.is_mrl_enabled(),
     "embedding_dimension": dimension,
     "embedding_model": "nomic-ai/nomic-embed-text-v1.5",
-    "created_at": datetime.utcnow().isoformat() + "Z",
+    "created_at": datetime.now(timezone.utc).isoformat(),
     "version": 2,
     "chunks_count": len(texts),
     "documents_count": len(documents)
@@ -414,7 +418,7 @@ with open(
         sort_keys=True
     )
 
-print(f"✅ Saved metadata: {SAVE_PATH}/metadata.json")
+print(f" Saved metadata: {SAVE_PATH}/metadata.json")
 
 section_counts = {}
 
@@ -425,7 +429,7 @@ for s in sections:
         + 1
     )
 
-print("\n📊 SECTION DISTRIBUTION:")
+print("\n SECTION DISTRIBUTION:")
 
 for k, v in section_counts.items():
 
@@ -434,6 +438,6 @@ for k, v in section_counts.items():
 # =========================================================
 # 🔹 COMPLETE
 # =========================================================
-print("\n✅ Indexing complete!")
+print("\n Indexing complete!")
 
-print(f"📁 Saved to: {SAVE_PATH}")
+print(f" Saved to: {SAVE_PATH}")

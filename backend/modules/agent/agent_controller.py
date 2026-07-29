@@ -3,6 +3,10 @@ from modules.generator.medgemma import generate_answer
 from modules.agent.evaluator import evaluate_answer
 from modules.agent.strategy import choose_strategy
 from modules.agent.memory import AgentMemory
+from modules.agent.semantic_cache import (
+    lookup_semantic_cache,
+    add_to_semantic_cache
+)
 import settings
 
 
@@ -412,6 +416,15 @@ def agent_decision(query_input):
 
         laqa_output = query_input
 
+    raw_query_str = laqa_output.get("original_query", laqa_output.get("raw_query", ""))
+
+    # =====================================================
+    # ⚡ SEMANTIC QUERY VECTOR CACHE LOOKUP (< 5ms)
+    # =====================================================
+    cached_payload = lookup_semantic_cache(raw_query_str)
+    if cached_payload is not None:
+        return cached_payload
+
     memory = AgentMemory()
 
     query_type = laqa_output.get(
@@ -642,8 +655,13 @@ def agent_decision(query_input):
             len(compressed_docs)
         )
 
+        eval_query = laqa_output.get(
+            "original_query",
+            laqa_output.get("expanded_query", "")
+        )
+
         eval_result = evaluate_answer(
-            laqa_output["expanded_query"],
+            eval_query,
             context,
             answer
         )
@@ -701,12 +719,12 @@ def agent_decision(query_input):
         # =====================================================
         # 🔹 BEST RESULT TRACKING
         # =====================================================
+        # Normalize score from [1..10] scale to [0.0..1.0] scale so weights 0.45/0.30/0.25 balance correctly
+        eval_score_norm = float(eval_result.get("score", 0)) / 10.0
+
         current_score = (
 
-            0.45 * eval_result.get(
-                "score",
-                0
-            )
+            0.45 * eval_score_norm
 
             +
 
@@ -751,6 +769,20 @@ def agent_decision(query_input):
         print("ACTION:", action)
 
         # =====================================================
+        # 🔹 MEMORY-INFORMED OVERRIDES
+        # Repeated low scores => escalate to increase_k.
+        # Query drift (3+ different rewrites) => return best early.
+        # =====================================================
+        if memory.repeated_failure() and action == "expand_query":
+            print("🔁 Memory: repeated failure \u2192 escalating to increase_k")
+            action = "increase_k"
+
+        if memory.query_drift_detected():
+            print("\u26a0\ufe0f Memory: query drift detected \u2192 returning best result early")
+            if best_result is not None:
+                return best_result
+
+        # =====================================================
         # 🔹 ACCEPT
         # =====================================================
         if action == "accept":
@@ -763,6 +795,7 @@ def agent_decision(query_input):
 
             else:
 
+                add_to_semantic_cache(raw_query_str, best_result)
                 return best_result
 
         # =====================================================
@@ -774,6 +807,7 @@ def agent_decision(query_input):
             attempt
         )
 
+
     # =====================================================
     # 🔹 MAX ATTEMPTS
     # =====================================================
@@ -781,6 +815,7 @@ def agent_decision(query_input):
 
     if best_result is not None:
 
+        add_to_semantic_cache(raw_query_str, best_result)
         return best_result
 
     return {
