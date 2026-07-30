@@ -1,10 +1,29 @@
+import os
+import sys
+
+# Ensure UTF-8 encoding for Windows console output (prevents UnicodeEncodeError on emojis)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
+# Exclude user Roaming site-packages to prevent torch/torchvision version conflicts between environments
+os.environ["PYTHONNOUSERSITE"] = "1"
+sys.path = [p for p in sys.path if r"AppData\Roaming\Python" not in p and r"AppData/Roaming/Python" not in p]
+
+# Prevent hardware thermal power surge at startup by capping C++/OpenMP/MKL thread pools
+os.environ["OMP_NUM_THREADS"] = "2"
+os.environ["MKL_NUM_THREADS"] = "2"
+os.environ["OPENBLAS_NUM_THREADS"] = "2"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "2"
+os.environ["NUMEXPR_NUM_THREADS"] = "2"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import faiss
 import numpy as np
 import pickle
-import os
 import re
 import json
-import sys
 from datetime import datetime, timezone
 from rank_bm25 import BM25Okapi
 
@@ -42,16 +61,13 @@ print(f"[DATABASE] MRL mode: {'ENABLED' if settings.is_mrl_enabled() else 'DISAB
 
 
 # =========================================================
-# 🔹 TOKENIZER
+# 🔹 TOKENIZER (OPTIMIZED)
 # =========================================================
+TOKEN_RE = re.compile(r"\b[a-zA-Z0-9\-]+\b")
+
 def tokenize(text):
+    return TOKEN_RE.findall(text.lower())
 
-    text = text.lower()
-
-    return re.findall(
-        r"\b[a-zA-Z0-9\-]+\b",
-        text
-    )
 
 
 # =========================================================

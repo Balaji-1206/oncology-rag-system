@@ -4,6 +4,14 @@ import io
 import json
 import math
 import os
+import sys
+
+# Ensure UTF-8 encoding for Windows console output (prevents UnicodeEncodeError on emojis)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -678,11 +686,13 @@ def _print_latency_block(title, stats_dict):
 # =========================================================
 # 🔹 MAIN EVALUATION
 # =========================================================
-def evaluate(dataset_path):
+def evaluate(dataset_path, limit=None):
 
     data = load_dataset(
         dataset_path
     )
+    if limit is not None:
+        data = data[:limit]
 
     results = []
 
@@ -692,13 +702,10 @@ def evaluate(dataset_path):
 
     print("\n🚀 Running Evaluation...\n")
 
-    total_questions = min(
-        100,
-        len(data)
-    )
+    total_questions = len(data)
 
     progress_bar = tqdm(
-        data[:100],
+        data,
         desc="🧪 Evaluating",
         ncols=120
     )
@@ -1600,11 +1607,18 @@ if __name__ == "__main__":
         default="backend/questions/cleaned_output.json",
         help="Path to the evaluation dataset JSON file."
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Number of questions to evaluate (e.g. 15)."
+    )
 
     args = parser.parse_args()
 
     results, bert = evaluate(
-        args.dataset
+        args.dataset,
+        limit=args.limit
     )
 
     print_report(

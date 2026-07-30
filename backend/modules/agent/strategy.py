@@ -107,6 +107,30 @@ def choose_strategy(
         return "accept"
 
     # =====================================================
+    # 🔹 HIGH SCORE / EVALUATOR ACCEPTANCE
+    # =====================================================
+    if (
+
+        not needs_retry
+
+        and score >= 8
+
+        and answered_question
+
+        and hallucination_risk == "low"
+
+        and answer_relevance >= 0.80
+
+        and contradiction_risk < 0.20
+
+        and not missing_information
+
+    ):
+
+        return "accept"
+
+
+    # =====================================================
     # 🔹 SAFE REFUSAL ACCEPT
     # =====================================================
     if refusal_detected:

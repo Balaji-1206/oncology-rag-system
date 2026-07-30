@@ -7,6 +7,7 @@ rank-bm25
 sentence-transformers
 torch
 PyPDF2
+pymupdf
 nltk
 rouge-score
 bert-score

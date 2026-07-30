@@ -1,350 +1,289 @@
-# Oncology Agentic RAG
+# 🧠 Oncology Agentic RAG
 
-**Intelligent document retrieval and question-answering system for oncology research and clinical queries.**
+**An Intelligent, Evidence-Grounded Medical Retrieval-Augmented Generation System for Oncology Research & Clinical Decision Support.**
 
-This system combines semantic search with large language models (LLMs) to enable clinical professionals and researchers to quickly find answers to oncology-related questions with full source attribution.
+Oncology Agentic RAG integrates advanced query prep (**LAQA**), hybrid vector-keyword retrieval (**MRL FAISS + BM25**), cross-encoder reranking, specialized medical LLMs (**MedGemma**), automated response evaluation with retry loops, and an **Explainable AI (XAI)** layer.
 
-## Overview
+---
 
-Oncology Agentic RAG is a Retrieval-Augmented Generation (RAG) application that:
-- **Ingests** medical documents (PDFs, text files) into a vector database
-- **Retrieves** contextually relevant documents using semantic search
-- **Generates** evidence-backed answers using an LLM with cited sources
+## 🌟 Key Features
 
-The system supports dual indexing modes (MRL and full) for flexible query strategies without requiring full reindexing.
+- 🏥 **Clinical Query Expansion (LAQA)** — Language-Aware Query Analyzer parses intent, medical category (treatment, diagnosis, symptoms, prognosis), cancer type, and expands short clinical queries into rich prompts.
+- ⚡ **Dual Indexing & Matryoshka Embeddings (MRL)** — Supports instant switching between MRL 512-dim (minimal, high speed) and Full 768-dim vector stores without reindexing.
+- 🔍 **Hybrid Retrieval & Reranking** — Fuses dense semantic vector search (FAISS) with sparse BM25 keyword search, boosted by medical entity matching and section alignment, then reranked via CrossEncoder.
+- 🩺 **MedGemma Generator** — Medical-specialized LLM produces evidence-backed, structured clinical answers.
+- 🔁 **Evaluator-Driven Retry Loop** — Autonomous verification checks grounding score, retrieval quality, answer relevance, and hallucination risk (Low/Medium/High), automatically retrying up to 3 times if quality falls below thresholds.
+- 💡 **XAI & Supporting Evidence Trace** — Generates step-by-step explainability traces and extracts exact supporting evidence sentences from retrieved documents.
+- 💻 **Interactive CLI Dashboard (`backend/app.py`)** — Boxed 6-step terminal output with ANSI bold labels and pipeline timing.
+- 🌐 **Modern Web Application (`backend/server.py` + `frontend/index.html`)** — Glassmorphism UI featuring live query intent chips, supporting evidence quote cards, interactive XAI drawer, radial confidence gauge, quality metrics subgrid, and history management.
+- 📊 **Evaluation & Statistics Suite** — Benchmark evaluation script (`evaluation.py`) and Paired $t$-test statistical significance tool (`paired_t_test.py`).
 
-## Features
+---
 
-- 📄 **Multi-format document ingestion** — PDFs, text files, and structured content
-- 🔍 **Semantic search** — Find clinically relevant documents using embeddings
-- 🤖 **LLM-powered answers** — Generate comprehensive responses with source attribution
-- 🔄 **Dual indexing support** — Switch between MRL (minimal) and full indexes instantly
-- ⚙️ **Configurable backends** — Swappable vector stores and language models
-- 🔌 **API & CLI interfaces** — Query via REST API or command-line tools
+## 🏗️ System Architecture & Pipeline Flow
 
-## Technical Architecture
-
-### Core Components
-- **Query Type**: Question-Answering (QA)
-- **RAG Strategy**: Agentic RAG with intelligent retrieval orchestration
-- **Generator Model**: MED-GEMMA (medical-specialized LLM)
-- **Response Optimization**: Explainable output (X-AI) for interpretable results
-
-### Retrieval Pipeline
-- **Pre-Retrieval**: Language-Aware Query Analyzer (LAQA) — understands medical terminology and context
-- **Chunking**: Agentic Chunking — intelligent segmentation of medical documents
-- **Embeddings**: Matryoshka Representation Learning (MRL) — efficient multi-scale embeddings
-- **Algorithm**: Hybrid retrieval (sparse + dense) — combines BM25 keyword matching with semantic search
-
-## System Requirements
-
-- **OS**: Windows 10/11
-- **Python**: 3.10 or higher
-- **Shell**: PowerShell or CMD
-- **Package manager**: pip
-- **API access**: OpenAI API key (or compatible provider)
-
-## Quick Setup (Windows)
-
-### Prerequisites
-- **Ollama** installed with MED-GEMMA model (or access to OpenAI API)
-  - Download: https://ollama.ai
-  - Setup MED-GEMMA: `ollama pull medgemma`
-
-### 1. Clone & Navigate
-```bash
-git clone <repo-url> 
-cd oncology-agentic-rag/backend
+```
+[ User Medical Query ]
+          │
+          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 1. LAQA (Language-Aware Query Analyzer)                 │
+│    • Intent & Category Parsing                          │
+│    • Medical Entity & Metadata Extraction               │
+│    • Query Expansion & Keyword Generation               │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 2. Hybrid Retrieval Engine                              │
+│    • Dense MRL FAISS Search (512-dim / 768-dim)          │
+│    • Sparse BM25 Keyword Search                         │
+│    • Adaptive Weight Fusion & Semantic Boosting        │
+│    • CrossEncoder Reranking                             │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 3. MedGemma Generator & Evaluator Retry Loop            │
+│    • Grounded Answer Generation                         │
+│    • Evaluator Scoring (Grounding, Relevance, Risk)     │
+│    • Auto-Retry Loop (Max 3 attempts if Score < 7)      │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 4. XAI & Explainability Layer                           │
+│    • Supporting Sentence Extraction                     │
+│    • Step-by-Step Reasoning Trace                       │
+│    • Confidence Score Calibration                       │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+    [ Structured Output / Web UI / CLI Dashboard ]
 ```
 
-### 2. Create Virtual Environment
-**PowerShell:**
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
+---
 
-**CMD:**
-```cmd
-python -m venv .venv
-.\.venv\Scripts\activate.bat
-```
-
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment
-Update `config/settings.py` for your setup:
-
-**For Local Models (Ollama):**
-```python
-GENERATOR_MODEL = "medgemma"
-MODEL_ENDPOINT = "http://localhost:11434"
-```
-
-**For Remote API (OpenAI):**
-```python
-GENERATOR_MODEL = "gpt-4"
-OPENAI_API_KEY = "sk-your-key-here"
-```
-## Usage
-
-### Index Documents (Agentic Chunking)
-```bash
-python index_data.py --input ./data/oncology_docs --store-type mrl
-```
-
-**Options:**
-- `--input`: Directory containing medical documents (PDFs, text)
-- `--store-type`: Index type (`mrl` for fast queries, `full` for comprehensive)
-- Uses Agentic Chunking to intelligently segment documents
-- Embeds using MRL for multi-scale similarity search
-
-### Start the Application
-**Option 1 - FastAPI Server:**
-```bash
-python app.py
-# API available at http://localhost:8000
-# Docs at http://localhost:8000/docs
-```
-
-**Option 2 - Alternative Server:**
-```bash
-python server.py
-```
-
-### Query the System
-**Via API:**
-```bash
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What are the latest immunotherapy treatments for metastatic melanoma?"}'
-```
-
-**Response includes:**
-- Answer generated by MED-GEMMA
-- Retrieved source documents
-- Confidence scores
-- Explainability info (X-AI)
-
-## Project Structure
+## 🛠️ Project Structure
 
 ```
 oncology-agentic-rag/
 ├── backend/
-│   ├── app.py                  # FastAPI application entry point
-│   ├── server.py               # Server utilities
-│   ├── index_data.py           # Data indexing pipeline
-│   ├── evaluation.py           # Execution testing script
-│   ├── metrics.py              # Text scoring helper utility
-│   ├── latency/
-│   │   ├── profile_pipeline.py # Pipeline profiling utility
-│   │   └── run_profile.py      # Profiler execution script
+│   ├── app.py                      # Interactive CLI Dashboard & Pipeline Entrypoint
+│   ├── server.py                   # Flask REST API Server & Web App Host
+│   ├── index_data.py               # Data Indexing Pipeline (Dual Indexing & Safeguards)
+│   ├── evaluation.py               # Benchmark Evaluation Runner
+│   ├── metrics.py                  # Text Similarity & Quality Metric Evaluators
+│   ├── paired_t_test.py            # Statistical Significance Test Suite
+│   ├── settings.py                 # Core System Configuration & Dynamic Loading
+│   ├── runtime_settings.json       # Dynamic Runtime Config State
 │   │
-│   ├── config/
-│   │   └── settings.py         # Configuration and environment settings
-│   │
-│   ├── modules/                # Core RAG components
+│   ├── modules/                    # Core RAG Modular Pipeline
 │   │   ├── agent/
-│   │   │   ├── agent_controller.py    # Agentic RAG orchestration
-│   │   │   ├── strategy.py            # Query strategy logic
-│   │   │   ├── evaluator.py           # Response evaluation
-│   │   │   └── memory.py              # Agent memory management
-│   │   │
+│   │   │   ├── agent_controller.py # Agentic Retry Loop & Strategy Selection
+│   │   │   ├── evaluator.py        # Response Quality & Hallucination Evaluator
+│   │   │   ├── semantic_cache.py   # Disk-Cached Query Similarity Store
+│   │   │   └── memory.py           # Context & Attempt Memory
 │   │   ├── laqa/
-│   │   │   └── laqa.py         # Language-Aware Query Analyzer (LAQA)
-│   │   │
-│   │   ├── chunking/
-│   │   │   └── chunker.py      # Agentic Chunking strategy
-│   │   │
-│   │   ├── embeddings/
-│   │   │   └── mrl_embeddings.py  # Matryoshka Representation Learning (MRL)
-│   │   │
+│   │   │   └── laqa.py             # Language-Aware Query Analyzer
 │   │   ├── retrieval/
-│   │   │   ├── hybrid_retriever.py  # Hybrid search (sparse + dense)
-│   │   │   └── reranker.py          # Result reranking
-│   │   │
+│   │   │   ├── hybrid_retriever.py # FAISS + BM25 Hybrid Retriever
+│   │   │   └── reranker.py         # CrossEncoder Document Reranker
+│   │   ├── chunking/
+│   │   │   └── chunker.py          # Agentic Medical Document Chunker
+│   │   ├── embeddings/
+│   │   │   └── mrl_embeddings.py   # MRL Dynamic Embedding Generator
 │   │   ├── generator/
-│   │   │   └── medgemma.py     # MED-GEMMA LLM interface
-│   │   │
+│   │   │   └── medgemma.py         # MedGemma LLM Generation Interface
 │   │   └── xai/
-│   │       └── explain.py      # Explainable AI (X-AI) for interpretability
+│   │       └── explain.py          # Explainable AI (XAI) Sentence Extractor
 │   │
-│   ├── database/               # Vector stores & persistence
-│   │   ├── mrl/                # MRL index (minimal, fast)
-│   │   ├── full/               # Full index (comprehensive)
-│   │   └── vector_store/       # Base vector database
+│   ├── database/                   # Persistent Stores
+│   │   ├── mrl/                    # MRL-enabled Vector Store (512-dim FAISS + BM25)
+│   │   ├── full/                   # Full-resolution Vector Store (768-dim FAISS + BM25)
+│   │   └── semantic_cache.json     # Cached Query-Answer Pairs
 │   │
 │   ├── data/
-│   │   └── oncology_docs/      # Source medical documents
-│   │
-│   ├── utils/                  # Utility functions
-│   ├── requirements.txt        # Python dependencies
-│   ├── Modelfile               # Ollama model configuration (MED-GEMMA)
-│   └── README.md
+│   │   └── oncology_docs/          # Source Medical PDF/Text Documents
+│   ├── questions/
+│   │   └── cleaned_output.json     # Benchmark Evaluation Dataset
+│   └── report/                     # Metric Reports & Statistical Results
 │
-├── DUAL_INDEX_IMPLEMENTATION.md # Technical documentation for dual indexing
-└── [other project files]
+├── frontend/
+│   └── index.html                  # Single-Page Web Application Interface
+│
+├── DUAL_INDEX_IMPLEMENTATION.md    # Technical Specs for Dual Database Architecture
+└── ARCHITECTURE.md                 # In-Depth System Pipeline & Module Specification
 ```
 
-**Key Directories:**
-- `database/mrl/` — MRL embeddings for fast retrieval
-- `database/full/` — Full embeddings for comprehensive search
-- `modules/` — Each module corresponds to a pipeline stage (LAQA → Chunking → Embeddings → Retrieval → Generation → X-AI)
+---
 
-## Testing
+## ⚡ Quick Setup & Installation
 
-### Run Tests
-```bash
-pytest                    # Run all tests
-pytest -v               # Verbose output
-pytest tests/test_*.py  # Specific test file
+### Prerequisites
+- **OS**: Windows 10/11, Linux, or macOS
+- **Python**: 3.10 or higher (Conda environment recommended)
+- **Ollama** (for local MedGemma LLM inference):
+  - Download & Install: [ollama.ai](https://ollama.ai)
+  - Pull model: `ollama pull medgemma`
+
+### 1. Clone & Environment Setup
+```powershell
+# Clone workspace
+git clone <repository-url>
+cd oncology-agentic-rag
+
+# Activate conda environment (or create venv)
+conda create -n rag python=3.10 -y
+conda activate rag
 ```
 
-## Configuration
-
-Configuration is managed in `backend/config/settings.py`.
-
-### Model Configuration
-**Local Models (Default - Ollama):**
-```python
-GENERATOR_MODEL = "medgemma"
-MODEL_ENDPOINT = "http://localhost:11434"  # Ollama server
-```
-
-**Remote Models (OpenAI/Alternative):**
-```python
-GENERATOR_MODEL = "gpt-4"
-OPENAI_API_KEY = "sk-..."  # API key
-```
-
-### Indexing Configuration
-- `VECTOR_STORE_TYPE`: `mrl` (minimal, faster) or `full` (comprehensive, slower)
-- `CHUNK_SIZE`: Document chunk size for agentic chunking
-- `CHUNK_OVERLAP`: Overlap between chunks to preserve context
-
-### RAG Pipeline Configuration
-- `USE_LAQA`: Enable Language-Aware Query Analyzer
-- `USE_HYBRID_RETRIEVAL`: Enable hybrid search (BM25 + semantic)
-- `RERANKER_MODEL`: Model for result reranking
-- `TOP_K_RETRIEVAL`: Number of documents to retrieve
-- `EXPLAINABILITY`: Enable X-AI explanation generation
-
-### Switching Between Index Modes
-```python
-# In config/settings.py
-VECTOR_STORE_TYPE = "mrl"   # Fast queries, minimal index
-# or
-VECTOR_STORE_TYPE = "full"  # Comprehensive results, larger index
-```
-No reindexing needed — instant switching!
-
-## Development
-
-### Project Architecture
-The system follows a modular pipeline:
-1. **LAQA** — Query analysis and medical term understanding
-2. **Chunking** — Agentic intelligent document segmentation
-3. **Embeddings** — MRL multi-scale semantic representations
-4. **Retrieval** — Hybrid search (BM25 + semantic)
-5. **Generation** — MED-GEMMA LLM answer synthesis
-6. **X-AI** — Explainability and interpretability layer
-
-### Adding New Modules
-```bash
-# Create new module in modules/
-mkdir modules/new_module
-touch modules/new_module/__init__.py
-touch modules/new_module/module.py
-
-# Import in agent orchestration
-# Update modules/agent/agent_controller.py
-```
-
-### Adding Dependencies
-```bash
-pip install <package>
-pip freeze > requirements.txt
-```
-
-### Code Standards
-- Use type hints for functions
-- Write tests for new features
-- Follow module-based structure
-- Update `config/settings.py` for new parameters
-
-### Testing Changes
-```bash
-# Test individual module
-python -c "from modules.laqa import laqa; laqa.analyze('test query')"
-
-# Run full pipeline
-python index_data.py --input ./data/oncology_docs --store-type mrl
-```
-
-### Troubleshooting
-
-**Module import errors:**
-```bash
-# Ensure you're in the backend directory
+### 2. Install Dependencies
+```powershell
 cd backend
-python -c "from modules.laqa import laqa; print('OK')"
+pip install -r requirements.txt
 ```
 
-**Ollama connection issues:**
-```bash
-# Check if Ollama is running (default: localhost:11434)
-# Windows: Start Ollama app, or run: ollama serve
-# Verify: curl http://localhost:11434
+---
+
+## 🗂️ Document Indexing
+
+Build the vector stores from source documents in `backend/data/oncology_docs/`.
+
+### Build Both Databases (Recommended Single-Pass):
+```powershell
+$env:PYTHONIOENCODING="utf-8"; $env:PYTHONUTF8=1; $env:PYTHONNOUSERSITE=1; python index_data.py --build-both
 ```
 
-**Vector store corruption:**
-```bash
-# Remove and re-index
-rmdir /s database\mrl
-rmdir /s database\full
-python index_data.py --input ./data/oncology_docs --store-type mrl
+### Build Specific Store:
+```powershell
+# Build MRL 512-dim store
+python index_data.py --store-type mrl
+
+# Build Full 768-dim store
+python index_data.py --store-type full
 ```
 
-**LAQA or chunking errors:**
-- Check document format (PDFs must be readable)
-- Verify `data/oncology_docs/` contains documents
-- Review `config/settings.py` for chunk size settings
+> **Note on Safety:** The indexing pipeline includes thread capping for PyTorch and incremental disk checkpointing every 500 chunks to prevent system thermal throttling and power interrupts.
 
-**Low answer quality:**
-- Try `--store-type full` for more comprehensive retrieval
-- Check if enough relevant documents were indexed
+---
 
-## Contributing
+## 🚀 Running the Application
 
-### How to Contribute
-1. **Report Issues** — Found a bug? Document it with:
-   - Reproduction steps
-   - Expected vs actual behavior
-   - Model/index mode used
-   
-2. **Improve Pipeline** — Enhance any module:
-   - LAQA query analysis
-   - Chunking strategy
-   - Retrieval algorithms
-   - Generation prompts
-   - X-AI explainability
+### Option 1: Interactive CLI Dashboard (`app.py`)
+Run the terminal dashboard for direct query processing:
+```powershell
+$env:PYTHONIOENCODING="utf-8"; $env:PYTHONUTF8=1; $env:PYTHONNOUSERSITE=1; python app.py
+```
+**Output Highlights:**
+- Step 1: Query Expansion (LAQA Intent, Category, Keywords)
+- Step 2: Top Retrieved Docs (Doc ID, Source File, Section, Scores, Snippet)
+- Step 3: Agent Answer
+- Step 4: Supporting Evidence Sentences
+- Step 5: XAI Reasoning Trace
+- Step 6: Quality Metrics (Confidence, Grounding, Retrieval, Hallucination Risk, Evaluator Status, Pipeline Latency)
 
-### Before Submitting
-```bash
-pytest                          # Run tests
+### Option 2: REST Server & Web Application (`server.py`)
+Launch the Flask backend server:
+```powershell
+$env:PYTHONIOENCODING="utf-8"; $env:PYTHONUTF8=1; $env:PYTHONNOUSERSITE=1; python server.py
+```
+- **Web App**: Open `http://localhost:5000/app` or `http://localhost:5000/` in your browser.
+- **REST API Endpoint**: `http://localhost:5000/query`
+
+---
+
+## 📡 REST API Reference
+
+### 1. Submit Medical Query
+`POST /query`
+```json
+// Request Body
+{
+  "query": "What are the targeted therapy options for EGFR mutated NSCLC?"
+}
 ```
 
-**Keep PRs focused** — one feature or fix per PR.
+```json
+// Response Body
+{
+  "answer": "Targeted therapy options for EGFR-mutated non-small cell lung cancer (NSCLC) include EGFR tyrosine kinase inhibitors (TKIs) such as Gefitinib, Erlotinib, Afatinib, and Osimertinib...",
+  "confidence": 0.82,
+  "reasoning": "1. Query identified as targeted therapy for EGFR NSCLC...\n2. Retrieved high-scoring clinical guidelines...",
+  "supporting_sentences": [
+    "Gefitinib, erlotinib, afatinib, osimertinib are used in histological variants of adenocarcinoma..."
+  ],
+  "grounded": true,
+  "quality": "High",
+  "sources": ["doc_3059", "doc_21189"],
+  "source_texts": ["Full text snippet 1...", "Full text snippet 2..."],
+  "evaluation": {
+    "score": 9,
+    "grounding_score": 0.92,
+    "retrieval_score": 0.62,
+    "answer_relevance": 1.0,
+    "hallucination_risk": "low"
+  },
+  "query_analysis": {
+    "intent": "clinical_guidance",
+    "query_type": "treatment",
+    "expanded_query": "what are the targeted therapy options for egfr mutated non-small cell lung cancer",
+    "keywords": ["targeted", "therapy", "egfr", "nsclc"],
+    "query_metadata": {
+      "cancer_type": "lung cancer",
+      "treatment_type": "targeted therapy"
+    }
+  },
+  "metrics": {
+    "laqa_time": 3.07,
+    "rag_time": 0.06,
+    "xai_time": 0.02,
+    "total_time": 3.16
+  }
+}
+```
 
+### 2. Runtime Settings & Database Toggle
+`GET /settings` — Get current active settings.  
+`POST /settings/update` — Update settings dynamically:
+```json
+{
+  "enable_laqa": true,
+  "enable_mrl": true,
+  "active_database": "mrl"
+}
+```
 
+### 3. System Validation
+`GET /system/validate-index` — Validates FAISS vector dimension and database metadata consistency.
 
-## Support & Contact
+---
 
-- **Project**: Oncology Agentic RAG — Intelligent oncology Q&A system
-- **Documentation**: See `DUAL_INDEX_IMPLEMENTATION.md` for dual indexing details
-- **Issues**: Report bugs and feature requests
-- **Model**: MED-GEMMA (via Ollama)
+## 📊 Evaluation & Benchmarking
 
+Run the pipeline benchmark evaluation against `questions/cleaned_output.json`:
+```powershell
+python evaluation.py
+```
+Run paired statistical significance tests:
+```powershell
+python paired_t_test.py
+```
+
+---
+
+## ⚙️ Configuration Parameters
+
+Configuration is managed dynamically via `backend/settings.py` and saved state in `backend/runtime_settings.json`:
+- `ENABLE_LAQA` — Enable/disable LAQA pre-retrieval query expansion.
+- `ENABLE_MRL` — Toggle MRL 512-dim vs Full 768-dim mode.
+- `RETRIEVAL_RELEVANCE_THRESHOLD` — Minimum relevance score for evidence.
+- `GENERATOR_MODEL` — `medgemma` (via Ollama or HuggingFace).
+
+---
+
+## 📜 Technical Documentation
+
+For detailed technical explanations, refer to:
+- 📖 [ARCHITECTURE.md](file:///c:/Users/Sandhiya%20P/NIT%20INTERN/oncology-agentic-rag/ARCHITECTURE.md) — Module-by-module architectural deep dive.
+- 📖 [DUAL_INDEX_IMPLEMENTATION.md](file:///c:/Users/Sandhiya%20P/NIT%20INTERN/oncology-agentic-rag/DUAL_INDEX_IMPLEMENTATION.md) — Technical specs for dual vector indexing.

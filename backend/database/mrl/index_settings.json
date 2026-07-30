@@ -1,6 +1,6 @@
 {
   "embedding_dimension": 512,
   "enable_mrl": true,
-  "full_embedding_dimension": 256,
+  "full_embedding_dimension": 768,
   "mrl_dimension": 512
 }

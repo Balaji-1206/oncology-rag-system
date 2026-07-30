@@ -1,845 +1,296 @@
+import settings
 from modules.retrieval.hybrid_retriever import hybrid_search
 from modules.generator.medgemma import generate_answer
 from modules.agent.evaluator import evaluate_answer
 from modules.agent.strategy import choose_strategy
 from modules.agent.memory import AgentMemory
-from modules.agent.semantic_cache import (
-    lookup_semantic_cache,
-    add_to_semantic_cache
-)
-import settings
+from modules.agent.semantic_cache import lookup_semantic_cache, add_to_semantic_cache
 
 
-# =========================================================
-# 🔹 SAFE QUERY EXPANSION
-# =========================================================
-def safe_expand_query(
-    query,
-    intent,
-    query_type,
-    retry_level=1
-):
-
-    # =====================================================
-    # 🔹 DEFINITION
-    # =====================================================
+def safe_expand_query(query: str, intent: str, query_type: str, retry_level: int = 1) -> str:
+    """Enriches query based on intent, category, and retry attempt level."""
     if query_type == "definition":
-
         extras = [
-
             "definition disease overview",
-
             "medical explanation pathology",
-
             "clinical characteristics oncology"
         ]
-
-    # =====================================================
-    # 🔹 LIST
-    # =====================================================
     elif query_type == "list":
-
         extras = [
-
             "oncology classification categories",
-
             "major cancer types classification",
-
             "common malignant neoplasm categories"
         ]
-
-    # =====================================================
-    # 🔹 RANKING
-    # =====================================================
     elif query_type == "ranking":
-
         extras = [
-
             "ranked oncology categories",
-
             "most common cancer ranking",
-
             "clinical prevalence importance"
         ]
-
-    # =====================================================
-    # 🔹 SYMPTOMS
-    # =====================================================
     elif query_type == "symptoms":
-
         extras = [
-
             "symptoms clinical signs presentation",
-
             "early manifestations oncology",
-
             "clinical findings disease presentation"
         ]
-
-    # =====================================================
-    # 🔹 TREATMENT
-    # =====================================================
     elif query_type == "treatment":
-
         extras = [
-
             "treatment therapy management",
-
             "standard oncology treatment",
-
             "clinical management options"
         ]
-
-    # =====================================================
-    # 🔹 COMPARISON
-    # =====================================================
     elif intent == "comparison":
-
         extras = [
-
             "comparison differences effectiveness",
-
             "clinical distinction oncology",
-
             "comparative medical features"
         ]
-
-    # =====================================================
-    # 🔹 YES/NO
-    # =====================================================
-    elif query_type == "yesno":
-
+    elif query_type == "epidemiology":
         extras = [
-
+            "incidence prevalence statistics",
+            "frequency percentage occurrence",
+            "clinical statistics epidemiology"
+        ]
+    elif query_type == "yesno":
+        extras = [
             "medical oncology evidence",
-
             "clinical evidence support",
-
             "oncology medical findings"
         ]
-
-    # =====================================================
-    # 🔹 EXPLORATORY
-    # =====================================================
     elif intent == "exploratory":
-
         extras = [
-
             "oncology diagnosis treatment",
-
             "clinical oncology overview",
-
+            "oncology evidence summary"
+        ]
+    else:
+        extras = [
+            "medical information oncology",
+            "clinical overview oncology",
             "oncology evidence summary"
         ]
 
-    # =====================================================
-    # 🔹 GENERAL
-    # =====================================================
-    else:
+    idx = min(retry_level - 1, len(extras) - 1)
+    extra_text = extras[idx]
 
-        extras = [
+    words = (query + " " + extra_text).split()
+    unique = []
+    seen = set()
+    for w in words:
+        if w.lower() not in seen:
+            unique.append(w)
+            seen.add(w.lower())
 
-            "oncology clinical information",
+    return " ".join(unique)[:300]
 
-            "medical oncology evidence",
 
-            "oncology disease information"
-        ]
+def is_generic_answer(answer: str) -> bool:
+    if not answer:
+        return True
 
-    retry_level = min(
-        retry_level,
-        len(extras)
-    )
-
-    extra = " ".join(
-        extras[:retry_level]
-    )
-
-    existing = set(
-        query.lower().split()
-    )
-
-    extra_words = [
-
-        w for w in extra.split()
-
-        if w.lower() not in existing
+    text = answer.lower().strip()
+    generic_patterns = [
+        "cannot answer",
+        "insufficient context",
+        "no information provided",
+        "context does not state",
+        "unable to determine",
+        "not mentioned in the provided",
+        "no specific details are given"
     ]
 
-    expanded = (
-        query
-        + " "
-        + " ".join(extra_words)
+    for p in generic_patterns:
+        if p in text:
+            return True
+
+    return len(text.split()) < 12
+
+
+def weak_answer(answer: str) -> bool:
+    if is_generic_answer(answer):
+        return True
+    return len(answer.strip().split()) < 15
+
+
+def safe_fallback_answer() -> str:
+    return (
+        "Based on available oncology literature, "
+        "a specific grounded answer could not be fully synthesized. "
+        "Please refine the query or consult official clinical guidelines."
     )
 
-    return expanded[:320]
 
-
-# =========================================================
-# 🔹 RETRIEVAL FAILURE DETECTION
-# =========================================================
-def retrieval_failed(
-    docs,
-    retrieval_score,
-    reranker_confidence
-):
-
-    if not docs:
-        return True
-
-    if retrieval_score < 0.32:
-        return True
-
-    if (
-        retrieval_score < 0.40
-        and reranker_confidence < 0.35
-    ):
-        return True
-
-    return False
-
-
-# =========================================================
-# 🔹 EDUCATIONAL QUERY REPAIR
-# =========================================================
-def educational_query_repair(
-    laqa_output
-):
-
-    if not settings.is_laqa_enabled():
-        return laqa_output
-
-    query_type = laqa_output.get(
-        "query_type",
-        "general"
-    )
-
-    original = laqa_output[
-        "original_query"
-    ]
-
-    if query_type == "definition":
-
-        laqa_output["expanded_query"] = (
-            original
-            +
-            " definition disease overview pathology"
-        )
-
-    elif query_type == "symptoms":
-
-        laqa_output["expanded_query"] = (
-            original
-            +
-            " symptoms clinical signs presentation"
-        )
-
-    elif query_type == "yesno":
-
-        laqa_output["expanded_query"] = (
-            original
-            +
-            " oncology medical evidence"
-        )
-
-    return laqa_output
-
-
-# =========================================================
-# 🔹 CONTEXT COMPRESSION
-# =========================================================
-def compress_docs(
-    docs,
-    query_type
-):
-
+def compress_context(docs: list, max_length: int = 1500) -> list:
+    """Limits total character length of context sent to LLM."""
     compressed = []
+    total_len = 0
 
-    if query_type in [
-        "list",
-        "ranking"
-    ]:
-
-        limit = 850
-
-    else:
-
-        limit = 700
-
-    for d in docs[:4]:
-
-        compressed.append(
-            d[:limit]
-        )
+    for doc in docs:
+        if total_len + len(doc) > max_length:
+            remaining = max_length - total_len
+            if remaining > 200:
+                compressed.append(doc[:remaining] + "...")
+            break
+        compressed.append(doc)
+        total_len += len(doc)
 
     return compressed
 
 
-# =========================================================
-# 🔹 WEAK ANSWER DETECTION
-# =========================================================
-def weak_answer(
-    answer
-):
+def evolve_retry_strategy(laqa_output: dict, action: str, attempt: int) -> dict:
+    """Adjusts retrieval parameters (k, query expansion) for retry iterations."""
+    new_output = dict(laqa_output)
 
-    if len(answer.strip()) < 3:
-        return True
+    if action == "increase_k":
+        current_k = new_output.get("retrieval_k", 5)
+        new_output["retrieval_k"] = min(current_k + 4, 15)
 
-    weak_patterns = [
+    elif action == "expand_query":
+        base_query = new_output.get("expanded_query") or new_output.get("original_query", "")
+        intent = new_output.get("intent", "factual")
+        query_type = new_output.get("query_type", "general")
 
-        "not enough information",
-
-        "insufficient evidence",
-
-        "unable to determine",
-
-        "context does not provide",
-
-        "the context discusses",
-
-        "based on the context"
-    ]
-
-    ans = answer.lower()
-
-    for p in weak_patterns:
-
-        if p in ans:
-            return True
-
-    return False
-
-
-# =========================================================
-# 🔹 RETRY EVOLUTION
-# =========================================================
-def evolve_retry_strategy(
-    laqa_output,
-    action,
-    attempt
-):
-
-    if (
-        not settings.is_laqa_enabled()
-        and action == "expand_query"
-    ):
-
-        laqa_output["expanded_query"] = laqa_output.get(
-            "original_query",
-            laqa_output.get("expanded_query", "")
-        )
-
-        return laqa_output
-
-    query_type = laqa_output.get(
-        "query_type",
-        "general"
-    )
-
-    intent = laqa_output.get(
-        "intent",
-        "factual"
-    )
-
-    # =====================================================
-    # 🔹 EXPAND QUERY
-    # =====================================================
-    if action == "expand_query":
-
-        laqa_output[
-            "expanded_query"
-        ] = safe_expand_query(
-
-            laqa_output[
-                "original_query"
-            ],
-
+        new_output["expanded_query"] = safe_expand_query(
+            base_query,
             intent,
-
             query_type,
-
-            retry_level=attempt + 1
+            retry_level=attempt
         )
+        new_output["expansion_source"] = "retry_heuristic"
 
-    # =====================================================
-    # 🔹 INCREASE K
-    # =====================================================
-    elif action == "increase_k":
+    elif action == "fallback_broad_search":
+        original_query = new_output.get("original_query", "")
+        new_output["expanded_query"] = original_query + " oncology overview clinical guidelines"
+        new_output["retrieval_k"] = 12
 
-        current_k = laqa_output.get(
-            "retrieval_k",
-            5
-        )
-
-        if attempt == 0:
-
-            new_k = current_k + 2
-
-        else:
-
-            new_k = current_k + 3
-
-        laqa_output[
-            "retrieval_k"
-        ] = min(new_k, 12)
-
-    return laqa_output
+    return new_output
 
 
-# =========================================================
-# 🔹 FINAL FALLBACK
-# =========================================================
-def safe_fallback_answer():
+def agent_decision(laqa_output: dict) -> dict:
+    """Orchestrates agentic retry loop: retrieval -> generation -> evaluation -> retry/accept."""
+    raw_query_str = laqa_output.get("original_query") or laqa_output.get("expanded_query", "")
 
-    return (
-        "I could not retrieve sufficiently "
-        "reliable oncology evidence to provide "
-        "a confident medical answer."
-    )
+    # Check Semantic Cache
+    cached_response = lookup_semantic_cache(raw_query_str)
+    if cached_response is not None:
+        print("  ⚡ [CACHE HIT] Returning cached response")
+        return cached_response
 
-
-# =========================================================
-# 🔹 MAIN AGENT LOOP
-# =========================================================
-def agent_decision(query_input):
-
-    # =====================================================
-    # 🔹 SUPPORT BOTH RAW QUERY + LAQA OUTPUT
-    # =====================================================
-    if isinstance(query_input, str):
-
-        laqa_output = settings.build_raw_query_payload(
-            query_input
-        )
-
-    else:
-
-        laqa_output = query_input
-
-    raw_query_str = laqa_output.get("original_query", laqa_output.get("raw_query", ""))
-
-    # =====================================================
-    # ⚡ SEMANTIC QUERY VECTOR CACHE LOOKUP (< 5ms)
-    # =====================================================
-    cached_payload = lookup_semantic_cache(raw_query_str)
-    if cached_payload is not None:
-        return cached_payload
-
+    best_result = None
+    best_score = -1.0
     memory = AgentMemory()
-
-    query_type = laqa_output.get(
-        "query_type",
-        "general"
-    )
-
-    if not settings.is_rag_enabled():
-
-        answer = generate_answer({
-
-            "query": laqa_output,
-
-            "context": []
-        })
-
-        context = ""
-
-        eval_result = evaluate_answer(
-            laqa_output["expanded_query"],
-            context,
-            answer
-        )
-
-        eval_result["retrieval_score"] = 0.0
-        eval_result["reranker_confidence"] = 0.0
-        eval_result["retrieval_diagnostics"] = []
-
-        memory.add({
-
-            "attempt": 1,
-
-            "query": laqa_output["expanded_query"],
-
-            "score": eval_result.get("score"),
-
-            "confidence": eval_result.get("confidence"),
-
-            "retrieval_score": 0.0,
-
-            "reranker_confidence": 0.0,
-
-            "missing_information": eval_result.get(
-                "missing_information"
-            ),
-
-            "grounding_score": eval_result.get(
-                "grounding_score"
-            ),
-
-            "answer": answer[:250]
-        })
-
-        return {
-
-            "answer": answer,
-
-            "docs": [],
-
-            "context_docs": [],
-
-            "doc_ids": [],
-
-            "eval": eval_result,
-
-            "candidate_texts": []
-        }
-
-    # =====================================================
-    # 🔹 ATTEMPTS
-    # =====================================================
     max_attempts = 3
 
-    # =====================================================
-    # 🔹 BEST RESULT
-    # =====================================================
-    best_result = None
+    for attempt in range(1, max_attempts + 1):
+        print(f"\n  🤖 Loop Iteration {attempt}/{max_attempts}")
 
-    best_score = -1
+        # Retrieval
+        retrieval_result = hybrid_search(laqa_output)
+        docs = retrieval_result.get("texts", [])
+        doc_ids = retrieval_result.get("ids", [])
+        retrieval_score = retrieval_result.get("retrieval_score", 0.0)
+        reranker_confidence = retrieval_result.get("reranker_confidence", 0.0)
+        query_metadata = retrieval_result.get("query_metadata", {})
 
-    # =====================================================
-    # 🔹 LOOP
-    # =====================================================
-    for attempt in range(max_attempts):
+        # Low retrieval score check
+        if retrieval_score < 0.25 and attempt < max_attempts:
+            print("  ⚠️ Low retrieval score, triggering fallback search")
+            laqa_output = evolve_retry_strategy(laqa_output, "fallback_broad_search", attempt)
+            continue
 
-        print(f"\n🔁 ATTEMPT {attempt + 1}")
+        compressed_docs = compress_context(docs)
 
-        # =====================================================
-        # 🔹 EDUCATIONAL RESCUE
-        # =====================================================
-        if (
-            settings.is_laqa_enabled()
-            and
-            attempt == 1
-            and query_type in [
-
-                "definition",
-
-                "symptoms",
-
-                "yesno"
-            ]
-        ):
-
-            print(
-                "🩺 Educational query repair"
-            )
-
-            laqa_output = educational_query_repair(
-                laqa_output
-            )
-
-        # =====================================================
-        # 🔹 RETRIEVAL
-        # =====================================================
-        retrieval_result = hybrid_search(
-            laqa_output,
-            None
-        )
-
-        docs = retrieval_result.get(
-            "texts",
-            []
-        )
-
-        doc_ids = retrieval_result.get(
-            "ids",
-            []
-        )
-
-        retrieval_score = retrieval_result.get(
-            "retrieval_score",
-            0.4
-        )
-
-        reranker_confidence = retrieval_result.get(
-            "reranker_confidence",
-            0.0
-        )
-
-        # =====================================================
-        # 🔹 RETRIEVAL FAILURE
-        # =====================================================
-        if retrieval_failed(
-            docs,
-            retrieval_score,
-            reranker_confidence
-        ):
-
-            print(
-                "⚠️ Retrieval quality too low"
-            )
-
-            if attempt < max_attempts - 1:
-
-                laqa_output = evolve_retry_strategy(
-                    laqa_output,
-                    "increase_k",
-                    attempt
-                )
-
-                continue
-
-            return {
-
-                "answer": safe_fallback_answer(),
-
-                "docs": [],
-
-                "context_docs": [],
-
-                "doc_ids": [],
-
-                "eval": {
-
-                    "score": 2,
-
-                    "confidence": 0.25,
-
-                    "needs_retry": False,
-
-                    "retrieval_score": retrieval_score,
-
-                    "reranker_confidence": reranker_confidence
-                }
-            }
-
-        # =====================================================
-        # 🔹 CONTEXT
-        # =====================================================
-        compressed_docs = compress_docs(
-            docs,
-            query_type
-        )
-
-        context = "\n".join(
-            compressed_docs[:3]
-        )[:2600]
-
-        # =====================================================
-        # 🔹 GENERATION
-        # =====================================================
-        agent_input = {
-
-            "query": laqa_output,
-
-            "context": compressed_docs
-        }
-
+        # Answer Generation
         answer = generate_answer(
-            agent_input
+            query=raw_query_str,
+            docs=compressed_docs,
+            intent=laqa_output.get("intent", "factual"),
+            query_type=laqa_output.get("query_type", "general"),
+            query_metadata=query_metadata,
+            keywords=laqa_output.get("keywords", [])
         )
 
-        # =====================================================
-        # 🔹 WEAK ANSWER
-        # =====================================================
-        if weak_answer(answer):
-
-            print(
-                "⚠️ Weak answer detected"
-            )
-
-        # =====================================================
-        # 🔹 EVALUATION
-        # =====================================================
-        print(
-            "EVALUATOR RECEIVED DOCS:",
-            len(compressed_docs)
-        )
-
-        eval_query = laqa_output.get(
-            "original_query",
-            laqa_output.get("expanded_query", "")
-        )
-
+        # Evaluation
         eval_result = evaluate_answer(
-            eval_query,
-            context,
-            answer
+            query=raw_query_str,
+            docs=compressed_docs,
+            answer=answer,
+            retrieval_score=retrieval_score,
+            intent=laqa_output.get("intent", "factual"),
+            query_type=laqa_output.get("query_type", "general")
         )
 
-        eval_result[
-            "retrieval_score"
-        ] = retrieval_score
-
-        eval_result[
-            "reranker_confidence"
-        ] = reranker_confidence
-
-        eval_result[
-            "retrieval_diagnostics"
-        ] = retrieval_result.get(
-            "retrieval_diagnostics",
-            []
-        )
-
-
-        # =====================================================
-        # 🔹 MEMORY
-        # =====================================================
-        memory.add({
-
-            "attempt": attempt + 1,
-
-            "query": laqa_output[
-                "expanded_query"
-            ],
-
-            "score": eval_result.get(
-                "score"
-            ),
-
-            "confidence": eval_result.get(
-                "confidence"
-            ),
-
+        # Update Memory
+        memory.add_step({
+            "attempt": attempt,
+            "expanded_query": laqa_output.get("expanded_query", ""),
+            "score": eval_result.get("score"),
+            "confidence": eval_result.get("confidence"),
             "retrieval_score": retrieval_score,
-
             "reranker_confidence": reranker_confidence,
-
-            "missing_information": eval_result.get(
-                "missing_information"
-            ),
-
-            "grounding_score": eval_result.get(
-                "grounding_score"
-            ),
-
+            "missing_information": eval_result.get("missing_information"),
+            "grounding_score": eval_result.get("grounding_score"),
             "answer": answer[:250]
         })
 
-        # =====================================================
-        # 🔹 BEST RESULT TRACKING
-        # =====================================================
-        # Normalize score from [1..10] scale to [0.0..1.0] scale so weights 0.45/0.30/0.25 balance correctly
+        # Track Best Result
         eval_score_norm = float(eval_result.get("score", 0)) / 10.0
-
-        current_score = (
-
-            0.45 * eval_score_norm
-
-            +
-
-            0.30 * retrieval_score
-
-            +
-
-            0.25 * reranker_confidence
-        )
-
+        current_score = (0.45 * eval_score_norm) + (0.30 * retrieval_score) + (0.25 * reranker_confidence)
         if weak_answer(answer):
-
             current_score *= 0.75
 
         if current_score > best_score:
-
             best_score = current_score
-
             best_result = {
-
                 "answer": answer,
-
                 "docs": docs,
-
                 "context_docs": compressed_docs,
-
                 "doc_ids": doc_ids,
-
                 "eval": eval_result,
-
                 "candidate_texts": retrieval_result.get("candidate_texts", [])
             }
 
-        # =====================================================
-        # 🔹 STRATEGY
-        # =====================================================
-        action = choose_strategy(
-            eval_result,
-            attempt
-        )
+        # Strategy Choice
+        action = choose_strategy(eval_result, attempt)
+        print(f"  🎯 Strategy : {action}")
 
-        print("ACTION:", action)
-
-        # =====================================================
-        # 🔹 MEMORY-INFORMED OVERRIDES
-        # Repeated low scores => escalate to increase_k.
-        # Query drift (3+ different rewrites) => return best early.
-        # =====================================================
+        # Memory Overrides
         if memory.repeated_failure() and action == "expand_query":
-            print("🔁 Memory: repeated failure \u2192 escalating to increase_k")
+            print("  🔁 Memory: repeated failure → escalating to increase_k")
             action = "increase_k"
 
         if memory.query_drift_detected():
-            print("\u26a0\ufe0f Memory: query drift detected \u2192 returning best result early")
+            print("  ⚠️ Memory: query drift detected → returning best result early")
             if best_result is not None:
                 return best_result
 
-        # =====================================================
-        # 🔹 ACCEPT
-        # =====================================================
+        # Accept Check
         if action == "accept":
-
             if weak_answer(answer):
-
-                print(
-                    "⚠️ Prevented weak accept"
-                )
-
+                print("  ⚠️ Prevented weak accept, continuing retry")
             else:
-
                 add_to_semantic_cache(raw_query_str, best_result)
                 return best_result
 
-        # =====================================================
-        # 🔹 RETRY EVOLUTION
-        # =====================================================
-        laqa_output = evolve_retry_strategy(
-            laqa_output,
-            action,
-            attempt
-        )
+        # Evolve for next attempt
+        laqa_output = evolve_retry_strategy(laqa_output, action, attempt)
 
-
-    # =====================================================
-    # 🔹 MAX ATTEMPTS
-    # =====================================================
-    print("\n⚠️ Max attempts reached")
-
+    print("\n  ⚠️ Max attempts reached, returning best available result")
     if best_result is not None:
-
         add_to_semantic_cache(raw_query_str, best_result)
         return best_result
 
     return {
-
         "answer": safe_fallback_answer(),
-
         "docs": [],
-
         "context_docs": [],
-
         "doc_ids": [],
-
         "eval": {
-
             "score": 2,
-
             "confidence": 0.25,
-
             "needs_retry": False,
-
             "retrieval_score": 0.0,
-
             "reranker_confidence": 0.0
         },
-
         "candidate_texts": []
     }

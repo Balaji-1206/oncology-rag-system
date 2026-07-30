@@ -1,0 +1,54 @@
+# Python Caches & Compiled Files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Large Document Data & PDF Ingestion
+backend/data/
+*.pdf
+
+# FAISS Vector Store Indexes & Pickles
+backend/database/*.pkl
+backend/database/*.index
+backend/database/vector_store/
+backend/database/mrl/*.pkl
+backend/database/mrl/*.index
+backend/database/full/*.pkl
+backend/database/full/*.index
+backend/database/semantic_cache.json
+*.pkl
+*.index
+
+# Evaluation & Performance Output Reports
+backend/report/
+backend/results/
+Note.txt
+Metrics.txt
+data.txt
+t_test.txt
+
+# Docling Experimental Pipeline
+backend/dockling/
+
+# Logs & Model Binaries
+*.log
+*.bin
+*.gguf

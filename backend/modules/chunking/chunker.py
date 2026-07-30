@@ -1,7 +1,13 @@
 import os
 import re
 import hashlib
-from PyPDF2 import PdfReader
+
+try:
+    import fitz  # PyMuPDF (10x-30x faster C-backed PDF reader)
+    HAS_PYMUPDF = True
+except ImportError:
+    HAS_PYMUPDF = False
+    from PyPDF2 import PdfReader
 
 from utils.metadata_tools import (
     classify_chunk_metadata
@@ -11,21 +17,29 @@ from utils.metadata_tools import (
 # =========================================================
 # 🔹 LOAD PDFS
 # =========================================================
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 def _load_single_pdf(args):
     folder_path, file = args
     path = os.path.join(folder_path, file)
     try:
-        reader = PdfReader(path)
-        text = ""
-
-        for page in reader.pages:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted + "\n"
-
-        text = text.strip()
+        if HAS_PYMUPDF:
+            doc = fitz.open(path)
+            pages = []
+            for page in doc:
+                t = page.get_text()
+                if t:
+                    pages.append(t)
+            doc.close()
+            text = "\n".join(pages).strip()
+        else:
+            reader = PdfReader(path)
+            pages = []
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    pages.append(extracted)
+            text = "\n".join(pages).strip()
 
         if len(text) < 500:
             print(f"[PDF] Skipping weak PDF: {file}")
@@ -48,33 +62,46 @@ def load_pdfs(folder_path, limit=None):
 
     print(f"[PDF] PDFs selected: {len(pdf_files)}")
 
-    max_workers = min(8, os.cpu_count() or 4)
+    # Use a conservative thread pool worker cap (max 2) to eliminate startup CPU/power surges
+    max_workers = min(2, os.cpu_count() or 2)
     tasks = [(folder_path, f) for f in pdf_files]
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        results = list(executor.map(_load_single_pdf, tasks))
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(_load_single_pdf, tasks))
+    except Exception:
+        results = [_load_single_pdf(t) for t in tasks]
 
     for res in results:
         if res is not None:
             documents.append(res)
 
+
     return documents
 
+
+import unicodedata
 
 # =========================================================
 # 🔹 CLEAN TEXT
 # =========================================================
 def clean_text(text):
 
+    # Normalize unicode (preserves Greek letters like alpha, beta, micro, degree, operators)
+    text = unicodedata.normalize("NFKC", text)
+
+    # Cleanly strip URLs and DOI links (keeps surrounding paragraph intact)
+    text = re.sub(r"https?://\S+|www\.\S+|doi\.org/\S+", "", text)
+
     # Fix broken line-wrap hyphens (e.g. "immuno-\ntherapy" -> "immunotherapy")
     text = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", text)
     text = re.sub(r"\s+", " ", text)
     text = re.sub(r"[-=_]{2,}", " ", text)
-    text = re.sub(r"[^\x00-\x7F]+", " ", text)
     text = re.sub(r"\.{2,}", ".", text)
     text = re.sub(r"\s+", " ", text)
 
     return text.strip()
+
 
 
 # =========================================================
@@ -251,11 +278,7 @@ def is_good_chunk(text):
         "table of contents",
         "copyright",
         "all rights reserved",
-        "isbn",
-        "doi.org",
-        "www.",
-        "http://",
-        "https://"
+        "isbn"
     ]
 
     for p in bad_patterns:
@@ -278,12 +301,15 @@ def is_good_chunk(text):
 def split_sentences(text):
 
     text = re.sub(r"([a-z])([A-Z])", r"\1. \2", text)
-    sentences = re.split(r"(?<=[.!?])\s+", text)
+
+    # Avoid splitting on common medical and standard abbreviations
+    abbrevs = r"(?<!\bet al)(?<!\bvs)(?<!\bFig)(?<!\bTab)(?<!\bNo)(?<!\bi\.e)(?<!\be\.g)(?<!\bDr)(?<!\bvol)(?<!\bmg)(?<!\bmL)(?<!\bRef)"
+    sentences = re.split(rf"{abbrevs}(?<=[.!?])\s+", text)
 
     cleaned = []
     for s in sentences:
         s = s.strip()
-        if len(s) > 20:
+        if len(s) >= 5:
             cleaned.append(s)
 
     return cleaned
@@ -304,7 +330,7 @@ def fallback_chunk(text, max_chunk_words=320, overlap_sentences=2):
     for sent in sentences:
         sent_words = len(sent.split())
 
-        if sent_words < 5:
+        if not sent.strip():
             continue
 
         if current_words + sent_words > max_chunk_words:
@@ -341,7 +367,7 @@ def deduplicate_chunks(chunks):
 
     for chunk in chunks:
         text = chunk["text"]
-        key = hashlib.md5(text[:300].lower().encode("utf-8")).hexdigest()
+        key = hashlib.md5(text.lower().encode("utf-8")).hexdigest()
 
         if key in seen_hashes:
             continue
@@ -351,6 +377,7 @@ def deduplicate_chunks(chunks):
 
     print(f" Chunks after deduplication: {len(unique)}")
     return unique
+
 
 
 # =========================================================

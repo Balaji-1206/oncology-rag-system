@@ -525,11 +525,27 @@ python index_data.py
 
 ---
 
+## Single-Pass Dual Building & Thermal Safeguards
+
+### `--build-both` Flag
+`index_data.py` supports building both `database/mrl` (512-dim) and `database/full` (768-dim) in a single execution pass:
+```powershell
+python index_data.py --build-both
+```
+
+### Thermal & Stability Safeguards
+- **PyTorch Thread Capping**: `torch.set_num_threads(4)` prevents CPU/GPU power surges and thermal shutdowns during embedding generation.
+- **Incremental Disk Checkpointing**: Saves index progress every 500 chunks to protect against sudden power interrupts.
+
+---
+
 ## Summary
 
 ✅ **FULLY IMPLEMENTED AND TESTED**
 
 - Dual index database support complete
+- Single-pass dual database indexing (`--build-both`)
+- PyTorch thread capping & incremental disk checkpointing
 - Instant MRL toggle without reindexing
 - Automatic backward compatibility migration
 - Startup validation with clear error messages
