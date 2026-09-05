@@ -123,27 +123,24 @@ def question_runner(
         final_query = question
 
     # -----------------------------------------------------
-    # 3️⃣ DENSE EMBEDDING
+    # 3️⃣-6️⃣ HYBRID RETRIEVAL (Embedding, FAISS, BM25, Fusion)
     # -----------------------------------------------------
     if rag_enabled:
+        retrieval_results = hybrid_search(
+            laqa_result,
+            None
+        )
+        timings = retrieval_results.get("retrieval_timings", {})
+        emb_time = timings.get("embedding_latency_s", 0.0)
+        faiss_time = timings.get("faiss_latency_s", 0.0)
+        bm25_time = timings.get("bm25_latency_s", 0.0)
+        fusion_time = timings.get("fusion_latency_s", 0.0)
 
-        with profiler.profile_stage("Dense Embedding"):
-
-            profiler.note_embedding_call(
-                final_query
-            )
-
-    # -----------------------------------------------------
-    # 4️⃣ FAISS SEARCH
-    # -----------------------------------------------------
-    if rag_enabled:
-
-        with profiler.profile_stage("FAISS Search"):
-
-            retrieval_results = hybrid_search(
-                laqa_result,
-                None
-            )
+        profiler.record_stage_duration("Dense Embedding", emb_time)
+        profiler.note_embedding_call(final_query)
+        profiler.record_stage_duration("FAISS Search", faiss_time)
+        profiler.record_stage_duration("BM25 Retrieval", bm25_time)
+        profiler.record_stage_duration("Hybrid Fusion", fusion_time)
 
     else:
 
@@ -153,26 +150,6 @@ def question_runner(
 
             "ids": []
         }
-
-    # -----------------------------------------------------
-    # 5️⃣ BM25
-    # already inside hybrid_search
-    # -----------------------------------------------------
-    if rag_enabled:
-
-        with profiler.profile_stage("BM25 Retrieval"):
-
-            pass
-
-    # -----------------------------------------------------
-    # 6️⃣ HYBRID FUSION
-    # already inside hybrid_search
-    # -----------------------------------------------------
-    if rag_enabled:
-
-        with profiler.profile_stage("Hybrid Fusion"):
-
-            pass
 
     # -----------------------------------------------------
     # 🔹 DOCS

@@ -117,7 +117,7 @@ def query():
                 "hallucination_risk": "medium"
             },
             "metrics": {},
-            "error": str(e)
+            "error": "An internal server error occurred while processing the clinical query."
         }), 500
 
 
@@ -129,12 +129,22 @@ def get_runtime_settings():
 
 @app.route("/settings/update", methods=["POST"])
 def update_runtime_settings():
-    """Updates runtime pipeline settings (LAQA, MRL mode)."""
+    """Updates runtime pipeline settings (LAQA, MRL mode) with input validation."""
     data = request.get_json()
     if not isinstance(data, dict):
         return jsonify({"error": "Missing JSON body"}), 400
 
-    updated = settings.update_settings(data)
+    allowed_keys = {
+        "enable_rag", "enable_laqa", "enable_mrl",
+        "active_database", "retrieval_relevance_threshold"
+    }
+    sanitized_data = {k: v for k, v in data.items() if k in allowed_keys}
+
+    if "active_database" in sanitized_data:
+        if sanitized_data["active_database"] not in {"mrl", "full", "dockling_mrl"}:
+            return jsonify({"error": "Invalid active_database. Must be 'mrl' or 'full'"}), 400
+
+    updated = settings.update_settings(sanitized_data)
     return jsonify({
         "enable_rag": updated["enable_rag"],
         "enable_laqa": updated["enable_laqa"],

@@ -105,13 +105,16 @@ def prune_redundancy(text: str) -> tuple[str, int]:
         if not line:
             continue
 
-        # Create signature from first 6 words to catch repeated phrasing
-        prefix = " ".join(line.lower().split()[:6])
-        if prefix in seen:
+        # Normalize line by stripping leading markdown bullet points / numbering
+        normalized = re.sub(r"^[\s*•\-\d.)]+", "", line).strip().lower()
+        normalized = re.sub(r"\s+", " ", normalized)
+
+        key = normalized if normalized else line.lower()
+        if key in seen:
             duplicates_removed += 1
             continue
 
-        seen.add(prefix)
+        seen.add(key)
         lines.append(line)
 
     cleaned = "\n".join(lines)

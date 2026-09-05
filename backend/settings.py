@@ -10,7 +10,7 @@ ENABLE_MRL = False
 ENABLE_RAG = True
 
 MRL_DIMENSION = 512
-FULL_EMBEDDING_DIMENSION = 768  # nomic-embed-text-v1.5 full resolution
+FULL_EMBEDDING_DIMENSION = 256  # In this repository, database/full was indexed with 256-d MRL resolution
 RETRIEVAL_RELEVANCE_THRESHOLD = 0.65
 
 # Settings Cache
@@ -35,6 +35,8 @@ def _defaults():
 def _coerce_bool(value, default):
     if isinstance(value, bool):
         return value
+    if isinstance(value, (int, float)):
+        return bool(value)
     if isinstance(value, str):
         lowered = value.strip().lower()
         if lowered in {"true", "1", "yes", "on"}:
@@ -130,10 +132,21 @@ def effective_embedding_dimension():
     active_db = get_active_database()
     if active_db == "dockling_mrl":
         return 512
+    # Check if active database directory contains authoritative metadata.json
+    db_path = get_database_path()
+    meta_path = os.path.join(db_path, "metadata.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+                if "embedding_dimension" in meta:
+                    return int(meta["embedding_dimension"])
+        except Exception:
+            pass
     data = get_settings()
-    if data["enable_mrl"]:
-        return int(data["mrl_dimension"])
-    return int(data["full_embedding_dimension"])
+    if data.get("enable_mrl"):
+        return int(data.get("mrl_dimension", 512))
+    return int(data.get("full_embedding_dimension", 256))
 
 
 def retrieval_relevance_threshold():
@@ -144,7 +157,11 @@ def get_database_path():
     """Returns absolute path to the active database folder."""
     active_db = get_active_database()
     if active_db == "dockling_mrl":
-        return os.path.join(BACKEND_DIR, "dockling", "database", "mrl")
+        dockling_path = os.path.join(BACKEND_DIR, "dockling", "database", "mrl")
+        if os.path.exists(dockling_path):
+            return dockling_path
+        # Safe fallback to default mrl database if dockling directory is absent
+        return os.path.join(BACKEND_DIR, "database", "mrl")
     if is_mrl_enabled():
         return os.path.join(BACKEND_DIR, "database", "mrl")
     return os.path.join(BACKEND_DIR, "database", "full")

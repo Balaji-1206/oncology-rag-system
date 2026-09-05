@@ -4,6 +4,7 @@ import re
 import json
 import shutil
 import pickle
+import time
 import faiss
 import numpy as np
 from datetime import datetime
@@ -25,7 +26,7 @@ def migrate_legacy_database():
     if not os.path.exists(legacy_path):
         return
 
-    print("🔍 Found legacy database, checking for migration...")
+    print("[INFO] Found legacy database, checking for migration...")
     legacy_faiss_path = f"{legacy_path}/faiss.index"
     if not os.path.exists(legacy_faiss_path):
         return
@@ -41,17 +42,17 @@ def migrate_legacy_database():
     elif dimension in (256, 768):
         was_mrl = False
     else:
-        print(f"⚠️ Legacy database has unknown dimension {dimension}, skipping migration")
+        print(f"[WARN] Legacy database has unknown dimension {dimension}, skipping migration")
         return
 
     target_db = "mrl" if was_mrl else "full"
     target_path = os.path.join(settings.BACKEND_DIR, "database", target_db)
 
     if os.path.exists(target_path):
-        print(f"✅ Target database {target_path} already exists, skipping migration")
+        print(f"[OK] Target database {target_path} already exists, skipping migration")
         return
 
-    print(f"📦 Migrating legacy database to {target_path}...")
+    print(f"[INFO] Migrating legacy database to {target_path}...")
     os.makedirs(target_path, exist_ok=True)
 
     files_to_copy = [
@@ -63,7 +64,7 @@ def migrate_legacy_database():
         src = f"{legacy_path}/{file}"
         if os.path.exists(src):
             shutil.copy2(src, f"{target_path}/{file}")
-            print(f"  ✓ Copied {file}")
+            print(f"  - Copied {file}")
 
     metadata_file = f"{target_path}/metadata.json"
     if not os.path.exists(metadata_file):
@@ -77,9 +78,9 @@ def migrate_legacy_database():
         }
         with open(metadata_file, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, sort_keys=True)
-        print("  ✓ Created metadata.json")
+        print("  - Created metadata.json")
 
-    print(f"✅ Migration complete. Legacy database kept at {legacy_path}")
+    print(f"[OK] Migration complete. Legacy database kept at {legacy_path}")
 
 
 # Run migration on import
@@ -120,16 +121,16 @@ def validate_database_consistency():
 
 
 # Load Database Validation
-print("🔥 Loading FAISS + BM25 indexes...")
+print("[INFO] Loading FAISS + BM25 indexes...")
 try:
     metadata = validate_database_consistency()
     db_path = settings.get_database_path()
-    print(f"✅ Database validation passed")
+    print(f"[OK] Database validation passed")
     print(f"   Active database: {db_path}")
     print(f"   MRL mode: {'ENABLED' if metadata['mrl_enabled'] else 'DISABLED'}")
     print(f"   Dimension: {metadata['embedding_dimension']}")
 except (FileNotFoundError, ValueError) as e:
-    print(f"❌ Database validation failed: {e}")
+    print(f"[ERROR] Database validation failed: {e}")
     raise
 
 
@@ -149,12 +150,16 @@ def _reload_all_indexes(verbose=False):
     """Reloads indexes from disk when active database path changes."""
     db_path = settings.get_database_path()
     if verbose:
-        print(f"🔄 Reloading indexes from {db_path}...")
+        print(f"[INFO] Reloading indexes from {db_path}...")
 
     _CACHE["faiss_index"] = faiss.read_index(f"{db_path}/faiss.index")
 
-    with open(f"{db_path}/bm25.pkl", "rb") as f:
-        _CACHE["bm25"] = pickle.load(f)
+    try:
+        with open(f"{db_path}/bm25.pkl", "rb") as f:
+            _CACHE["bm25"] = pickle.load(f)
+    except Exception as exc:
+        print(f"[WARN] Failed to load BM25 index ({exc}). Falling back to dense-only retrieval.")
+        _CACHE["bm25"] = None
     with open(f"{db_path}/ids.pkl", "rb") as f:
         _CACHE["ids"] = pickle.load(f)
     with open(f"{db_path}/id_to_text.pkl", "rb") as f:
@@ -178,7 +183,7 @@ def _reload_all_indexes(verbose=False):
 
     _CACHE["current_db_path"] = db_path
     if verbose:
-        print(f"✅ Indexes reloaded successfully")
+        print(f"[OK] Indexes reloaded successfully")
 
 
 def get_index():
@@ -409,11 +414,16 @@ def hybrid_search(query_payload, k=None):
     current_id_to_text = get_id_to_text()
     current_chunk_metadata = get_chunk_metadata()
 
+    t_start_total = time.perf_counter()
+
     # Dense Search (Nomic Embed v1.5 requires 'search_query: ' prefix for asymmetric retrieval)
+    t_start_emb = time.perf_counter()
     query_for_emb = query if query.startswith("search_query: ") else f"search_query: {query}"
     q_emb = get_dynamic_mrl_embedding(query_for_emb, target_dim=settings.effective_embedding_dimension())
     q_emb = np.asarray(q_emb, dtype=np.float32).reshape(1, -1)
+    t_emb_duration = time.perf_counter() - t_start_emb
 
+    t_start_faiss = time.perf_counter()
     candidate_multiplier = 4
     search_k = min(retrieval_k * candidate_multiplier, current_faiss.ntotal)
     dense_scores, dense_indices = current_faiss.search(q_emb, search_k)
@@ -423,25 +433,36 @@ def hybrid_search(query_payload, k=None):
         if idx != -1 and idx < len(current_ids):
             doc_id = current_ids[idx]
             dense_candidates[doc_id] = float(score)
+    t_faiss_duration = time.perf_counter() - t_start_faiss
 
     # Sparse BM25 Search
-    q_tokens = tokenize(query)
-    bm25_scores = current_bm25.get_scores(q_tokens)
-    top_bm25_indices = np.argsort(bm25_scores)[::-1][:search_k]
-
+    t_start_bm25 = time.perf_counter()
     sparse_candidates = {}
-    for idx in top_bm25_indices:
-        score = bm25_scores[idx]
-        if score > 0:
-            doc_id = current_ids[idx]
-            sparse_candidates[doc_id] = float(score)
+    if current_bm25 is not None:
+        q_tokens = tokenize(query)
+        bm25_scores = current_bm25.get_scores(q_tokens)
+        top_bm25_indices = np.argsort(bm25_scores)[::-1][:search_k]
+        for idx in top_bm25_indices:
+            score = bm25_scores[idx]
+            if score > 0:
+                doc_id = current_ids[idx]
+                sparse_candidates[doc_id] = float(score)
+    t_bm25_duration = time.perf_counter() - t_start_bm25
 
+    t_start_fusion = time.perf_counter()
     all_candidate_ids = list(set(dense_candidates.keys()).union(set(sparse_candidates.keys())))
     if not all_candidate_ids:
         return {
             "texts": [], "ids": [], "retrieval_score": 0.0,
             "reranker_confidence": 0.0, "query_metadata": query_metadata,
-            "retrieval_diagnostics": [], "candidate_texts": []
+            "retrieval_diagnostics": [], "candidate_texts": [],
+            "retrieval_timings": {
+                "embedding_latency_s": t_emb_duration,
+                "faiss_latency_s": t_faiss_duration,
+                "bm25_latency_s": t_bm25_duration,
+                "fusion_latency_s": 0.0,
+                "total_hybrid_retrieval_s": time.perf_counter() - t_start_total
+            }
         }
 
     # Normalize scores
@@ -536,9 +557,9 @@ def hybrid_search(query_payload, k=None):
         })
 
     # CLI Output
-    print("\n" + "─" * 66)
-    print("  \033[1mStep 2 · Top Retrieved Docs\033[0m")
-    print("─" * 66)
+    print("\n" + "-" * 66)
+    print("  \033[1mStep 2 - Top Retrieved Docs\033[0m")
+    print("-" * 66)
 
     for i, doc_id in enumerate(final_ids):
         text = current_id_to_text.get(doc_id, "")
@@ -552,7 +573,7 @@ def hybrid_search(query_payload, k=None):
                 meta = {}
 
         source = meta.get("source_file") or meta.get("source_doc") or meta.get("source") or chunk_record.get("source_doc", "") or "unknown"
-        section = meta.get("section") or chunk_record.get("section", "") or "—"
+        section = meta.get("section") or chunk_record.get("section", "") or "-"
         page = meta.get("page", "") or meta.get("page_number", "")
         page_str = f"  p.{page}" if page else ""
 
@@ -566,6 +587,9 @@ def hybrid_search(query_payload, k=None):
         print(f"      \033[1mScores  :\033[0m Semantic=\033[1m{sem:.3f}\033[0m  Reranker=\033[1m{rnk:.3f}\033[0m  Final=\033[1m{fin:.3f}\033[0m")
         print(f"      \033[1mSnippet :\033[0m {text[:150].strip()} ...")
 
+    t_fusion_duration = time.perf_counter() - t_start_fusion
+    t_total_duration = time.perf_counter() - t_start_total
+
     return {
         "texts": final_texts,
         "ids": final_ids,
@@ -573,5 +597,12 @@ def hybrid_search(query_payload, k=None):
         "reranker_confidence": reranker_confidence,
         "query_metadata": query_metadata,
         "retrieval_diagnostics": retrieval_diagnostics,
-        "candidate_texts": candidate_texts
+        "candidate_texts": candidate_texts,
+        "retrieval_timings": {
+            "embedding_latency_s": t_emb_duration,
+            "faiss_latency_s": t_faiss_duration,
+            "bm25_latency_s": t_bm25_duration,
+            "fusion_latency_s": t_fusion_duration,
+            "total_hybrid_retrieval_s": t_total_duration
+        }
     }

@@ -6,7 +6,7 @@ import torch
 # =========================================================
 # 🔹 LOAD ONCE
 # =========================================================
-print("🔥 Loading reranker model ONCE...")
+print("[INFO] Loading reranker model ONCE...")
 
 _DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 

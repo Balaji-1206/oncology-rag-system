@@ -1,3 +1,4 @@
+import os
 import re
 import requests
 import numpy as np
@@ -343,7 +344,7 @@ def quality_label(score):
 # =========================================================
 # REASONING OUTPUT CLEANING
 # =========================================================
-REASONING_MODEL = "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q5_K_M"
+REASONING_MODEL = os.environ.get("OLLAMA_MODEL", "hf.co/unsloth/medgemma-1.5-4b-it-GGUF:Q4_K_M")
 
 LEAK_PATTERNS = [
     r"\bthought\b",

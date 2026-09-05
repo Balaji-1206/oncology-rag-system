@@ -205,7 +205,8 @@ def build_context(
     docs,
     query,
     intent,
-    query_type
+    query_type,
+    max_chars=6000
 ):
 
     if not docs:
@@ -381,7 +382,7 @@ def build_context(
 
     context = "\n\n".join(context_blocks)
 
-    return context[:1800]
+    return context[:max_chars]
 
 
 # =========================================================

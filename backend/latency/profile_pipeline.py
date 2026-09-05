@@ -316,6 +316,10 @@ class PipelineProfiler:
         with self.profile_stage(stage_name):
             return fn(*args, **kwargs)
 
+    def record_stage_duration(self, stage_name: str, elapsed: float) -> None:
+        """Explicitly records elapsed time (in seconds) for an individually timed stage."""
+        self._add_stage_time(stage_name, max(0.0, float(elapsed)))
+
     @contextlib.contextmanager
     def model_load(self, model_name: str):
         start = time.perf_counter()

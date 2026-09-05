@@ -75,9 +75,9 @@ def get_model():
         _device = "cuda" if torch.cuda.is_available() else "cpu"
 
         if _device == "cuda":
-            print(f"⚡ [DEVICE] Using GPU acceleration: {torch.cuda.get_device_name(0)} (CUDA)")
+            print(f"[INFO] [DEVICE] Using GPU acceleration: {torch.cuda.get_device_name(0)} (CUDA)")
         else:
-            print("💻 [DEVICE] Running in CPU mode (safe 2-thread cap enabled)")
+            print("[INFO] [DEVICE] Running in CPU mode (safe 2-thread cap enabled)")
 
         _model = SentenceTransformer(
             MRL_MODEL_NAME,

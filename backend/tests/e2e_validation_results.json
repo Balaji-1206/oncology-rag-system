@@ -1,0 +1,202 @@
+[
+  {
+    "label": "1. Factual/Definition",
+    "query": "What is carcinoma and what are its primary histological subtypes?",
+    "status": "SUCCESS",
+    "total_elapsed_s": 3.89,
+    "api_request_time": 3.86,
+    "intent": "enumeration",
+    "query_type": "list",
+    "keywords": [
+      "carcinoma",
+      "its",
+      "primary",
+      "histological",
+      "subtypes",
+      "classification"
+    ],
+    "retrieved_count": 8,
+    "top_sources": [
+      "doc_3035",
+      "doc_2129",
+      "doc_3049"
+    ],
+    "grounded": true,
+    "quality": "Medium",
+    "evaluation": {
+      "answer_relevance": 0.29,
+      "grounding_score": 0.29,
+      "hallucination_risk": "medium",
+      "retrieval_score": 0.33,
+      "score": 5
+    },
+    "stage_latencies": {
+      "answer_relevance": 0.29,
+      "grounding_score": 0.29,
+      "hallucination_risk": "medium",
+      "laqa_time": 0.02,
+      "rag_time": 0.0,
+      "retrieval_score": 0.33,
+      "total_time": 3.86,
+      "xai_time": 3.84
+    },
+    "answer_preview": "Unable to generate a medical answer.",
+    "reasoning_preview": "- **Identify Carcinoma Definition:** The source mentions \"Histological classification of carcinomas\". It defines them broadly but doesn't give a precise definition within this context.\n- **Identify Su"
+  },
+  {
+    "label": "2. Treatment-related",
+    "query": "What are common first-line treatments for HER2-positive metastatic breast cancer?",
+    "status": "SUCCESS",
+    "total_elapsed_s": 49.63,
+    "api_request_time": 49.62,
+    "intent": "clinical_guidance",
+    "query_type": "treatment",
+    "keywords": [
+      "common",
+      "first-line",
+      "treatments",
+      "her2-positive",
+      "metastatic",
+      "breast"
+    ],
+    "retrieved_count": 7,
+    "top_sources": [
+      "doc_17608",
+      "doc_15173",
+      "doc_15196"
+    ],
+    "grounded": true,
+    "quality": "High",
+    "evaluation": {
+      "grounding_score": 0.87,
+      "answer_relevance": 0.87,
+      "retrieval_score": 0.85,
+      "hallucination_risk": "low"
+    },
+    "stage_latencies": {
+      "laqa_time": 8.68,
+      "rag_time": 30.28,
+      "xai_time": 10.65,
+      "total_time": 49.62
+    },
+    "answer_preview": "Common first-line treatments for HER2-positive metastatic breast cancer include aromatase inhibitors (anastrozole, letrozole, or exemestane) and taxanes combined with trastuzumab.",
+    "reasoning_preview": "- **Identify key information:** The question asks about *common first-line* treatments specifically for *HER2-positive metastatic* breast cancer.\n- **Scan retrieved evidence for relevant sentences:**."
+  },
+  {
+    "label": "3. Comparison",
+    "query": "Compare the clinical features of small cell lung cancer versus non-small cell lung cancer.",
+    "status": "SUCCESS",
+    "total_elapsed_s": 32.56,
+    "api_request_time": 32.54,
+    "intent": "analytical",
+    "query_type": "comparison",
+    "keywords": [
+      "clinical",
+      "features",
+      "small",
+      "cell",
+      "lung",
+      "cancer"
+    ],
+    "retrieved_count": 8,
+    "top_sources": [
+      "doc_7473",
+      "doc_7446",
+      "doc_16469"
+    ],
+    "grounded": true,
+    "quality": "Medium",
+    "evaluation": {
+      "grounding_score": 0.6,
+      "answer_relevance": 0.6,
+      "retrieval_score": 0.6,
+      "hallucination_risk": "low"
+    },
+    "stage_latencies": {
+      "laqa_time": 6.05,
+      "rag_time": 16.72,
+      "xai_time": 9.77,
+      "total_time": 32.54
+    },
+    "answer_preview": "The provided context discusses treatments and staging for both small cell lung cancer (SCLC) and non-small cell lung cancer (NSCLC). It does not compare the clinical features of SCLC versus NSCLC. I don't have enough information in the retrieved docu",
+    "reasoning_preview": "- **Analyze the Request:** The core task is a comparison of clinical features between SCLC and NSCLC.\n- **Evaluate Evidence."
+  },
+  {
+    "label": "4. Evidence-heavy/Staging",
+    "query": "In lung cancer staging, what is the clinical significance of mediastinal lymph node enlargement measuring 1.5 cm on a CT scan?",
+    "status": "SUCCESS",
+    "total_elapsed_s": 32.62,
+    "api_request_time": 32.62,
+    "intent": "clinical_guidance",
+    "query_type": "treatment",
+    "keywords": [
+      "lung",
+      "cancer",
+      "staging",
+      "clinical",
+      "significance",
+      "mediastinal"
+    ],
+    "retrieved_count": 7,
+    "top_sources": [
+      "doc_12174",
+      "doc_17548",
+      "doc_21174"
+    ],
+    "grounded": true,
+    "quality": "High",
+    "evaluation": {
+      "grounding_score": 0.74,
+      "answer_relevance": 0.74,
+      "retrieval_score": 0.74,
+      "hallucination_risk": "low"
+    },
+    "stage_latencies": {
+      "laqa_time": 6.02,
+      "rag_time": 17.36,
+      "xai_time": 9.23,
+      "total_time": 32.62
+    },
+    "answer_preview": "Mediastinal lymph node enlargement measuring 1.5 cm has clinical significance in lung cancer staging as it suggests potential involvement of these nodes. This finding warrants further investigation to determine if the disease is localized or metastat",
+    "reasoning_preview": "- Mediastinal lymph node enlargement measuring 1.5 cm on CT scan suggests potential involvement of these nodes in lung cancer staging.\n- This finding indicates the need for further investigation to de"
+  },
+  {
+    "label": "5. Out-of-domain/Insufficient",
+    "query": "What are the standard chemotherapy protocols for automotive engine mechanical failure?",
+    "status": "SUCCESS",
+    "total_elapsed_s": 65.58,
+    "api_request_time": 65.55,
+    "intent": "clinical_guidance",
+    "query_type": "treatment",
+    "keywords": [
+      "standard",
+      "chemotherapy",
+      "protocols",
+      "automotive",
+      "engine",
+      "mechanical"
+    ],
+    "retrieved_count": 7,
+    "top_sources": [
+      "doc_16190",
+      "doc_16189",
+      "doc_17666"
+    ],
+    "grounded": true,
+    "quality": "Medium",
+    "evaluation": {
+      "grounding_score": 0.35,
+      "answer_relevance": 0.35,
+      "retrieval_score": 0.37,
+      "hallucination_risk": "medium"
+    },
+    "stage_latencies": {
+      "laqa_time": 6.08,
+      "rag_time": 49.77,
+      "xai_time": 9.7,
+      "total_time": 65.55
+    },
+    "answer_preview": "Unable to generate a reliable medical answer.",
+    "reasoning_preview": "- **Analyze the Request:** The core task is to generate concise oncology sentences (2-4 bullets) summarizing the standard chemotherapy protocols mentioned in the source material, adhering strictly to "
+  }
+]
