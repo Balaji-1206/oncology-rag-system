@@ -120,19 +120,41 @@ def safe_fallback_answer() -> str:
     )
 
 
-def compress_context(docs: list, max_length: int = 1500) -> list:
-    """Limits total character length of context sent to LLM."""
+DEFAULT_MAX_CONTEXT_LENGTH = 6000
+
+
+def compress_context(docs: list, max_length: int = DEFAULT_MAX_CONTEXT_LENGTH) -> list:
+    """Limits total character length of context sent to LLM while preserving sentence boundaries."""
     compressed = []
     total_len = 0
 
     for doc in docs:
-        if total_len + len(doc) > max_length:
+        if not doc or not str(doc).strip():
+            continue
+        doc_str = str(doc).strip()
+        doc_len = len(doc_str)
+
+        if total_len + doc_len <= max_length:
+            compressed.append(doc_str)
+            total_len += doc_len
+        else:
             remaining = max_length - total_len
-            if remaining > 200:
-                compressed.append(doc[:remaining] + "...")
+            if remaining >= 200:
+                candidate = doc_str[:remaining]
+                last_punct = max(
+                    candidate.rfind(". "),
+                    candidate.rfind(".\n"),
+                    candidate.rfind("? "),
+                    candidate.rfind("! ")
+                )
+                if last_punct > 100:
+                    clean_chunk = candidate[:last_punct + 1].strip()
+                else:
+                    last_space = candidate.rfind(" ")
+                    clean_chunk = candidate[:last_space].strip() if last_space > 100 else candidate.strip()
+                if clean_chunk:
+                    compressed.append(clean_chunk)
             break
-        compressed.append(doc)
-        total_len += len(doc)
 
     return compressed
 
@@ -201,7 +223,7 @@ def agent_decision(laqa_output: dict) -> dict:
         compressed_docs = compress_context(docs)
 
         # Answer Generation
-        answer = generate_answer(
+        gen_output = generate_answer(
             query=raw_query_str,
             docs=compressed_docs,
             intent=laqa_output.get("intent", "factual"),
@@ -209,6 +231,15 @@ def agent_decision(laqa_output: dict) -> dict:
             query_metadata=query_metadata,
             keywords=laqa_output.get("keywords", [])
         )
+
+        if isinstance(gen_output, dict):
+            answer = gen_output.get("answer", "")
+            raw_answer = gen_output.get("raw_answer", answer)
+            optimization_stats = gen_output.get("optimization_stats", {})
+        else:
+            answer = str(gen_output)
+            raw_answer = answer
+            optimization_stats = {}
 
         # Evaluation
         eval_result = evaluate_answer(
@@ -243,6 +274,8 @@ def agent_decision(laqa_output: dict) -> dict:
             best_score = current_score
             best_result = {
                 "answer": answer,
+                "raw_answer": raw_answer,
+                "optimization_stats": optimization_stats,
                 "docs": docs,
                 "context_docs": compressed_docs,
                 "doc_ids": doc_ids,
@@ -282,6 +315,14 @@ def agent_decision(laqa_output: dict) -> dict:
 
     return {
         "answer": safe_fallback_answer(),
+        "raw_answer": safe_fallback_answer(),
+        "optimization_stats": {
+            "raw_chars": len(safe_fallback_answer()),
+            "optimized_chars": len(safe_fallback_answer()),
+            "reduction_percent": 0.0,
+            "artifacts_stripped": 0,
+            "duplicate_lines_removed": 0
+        },
         "docs": [],
         "context_docs": [],
         "doc_ids": [],

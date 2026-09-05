@@ -769,7 +769,7 @@ def evaluate(dataset_path, limit=None):
         candidate_docs = result.get(
             "candidate_texts",
             []
-        ) or context_docs
+        )
 
         print(
             "EVALUATOR RECEIVED DOCS:",

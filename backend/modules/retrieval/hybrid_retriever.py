@@ -10,7 +10,7 @@ from datetime import datetime
 from threading import Lock
 
 import settings
-from modules.retrieval.reranker import rerank
+from modules.retrieval.reranker import rerank, score_candidates
 from modules.embeddings.mrl_embeddings import get_dynamic_mrl_embedding
 from utils.metadata_tools import (
     classify_query_metadata,
@@ -409,9 +409,10 @@ def hybrid_search(query_payload, k=None):
     current_id_to_text = get_id_to_text()
     current_chunk_metadata = get_chunk_metadata()
 
-    # Dense Search
-    q_emb = get_dynamic_mrl_embedding(query, target_dim=settings.effective_embedding_dimension())
-    q_emb = np.array([q_emb], dtype=np.float32)
+    # Dense Search (Nomic Embed v1.5 requires 'search_query: ' prefix for asymmetric retrieval)
+    query_for_emb = query if query.startswith("search_query: ") else f"search_query: {query}"
+    q_emb = get_dynamic_mrl_embedding(query_for_emb, target_dim=settings.effective_embedding_dimension())
+    q_emb = np.asarray(q_emb, dtype=np.float32).reshape(1, -1)
 
     candidate_multiplier = 4
     search_k = min(retrieval_k * candidate_multiplier, current_faiss.ntotal)
@@ -491,7 +492,7 @@ def hybrid_search(query_payload, k=None):
 
     candidate_texts = [current_id_to_text.get(d, "") for d in top_candidates]
 
-    rerank_results = rerank(query, candidate_texts)
+    rerank_results = score_candidates(query, candidate_texts, query_type=query_type)
     for res in rerank_results:
         c_idx = res["candidate_index"]
         if c_idx < len(top_candidates):

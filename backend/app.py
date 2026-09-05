@@ -69,8 +69,13 @@ def handle_query(user_query: str):
             "answer_relevance": eval_result.get("answer_relevance", 0)
         }
 
+        raw_answer = agent_result.get("raw_answer", answer)
+        optimization_stats = agent_result.get("optimization_stats", {})
+
         return {
             "answer": answer,
+            "raw_answer": raw_answer,
+            "optimization_stats": optimization_stats,
             "confidence": confidence,
             "sources": doc_ids,
             "source_texts": docs,
@@ -79,6 +84,10 @@ def handle_query(user_query: str):
             "explanation": explanation,
             "evaluation": eval_result,
             "metrics": metrics,
+            "disclaimer": (
+                "For research and educational purposes only. "
+                "Not certified for direct clinical diagnosis or medical decision support."
+            ),
             "query_analysis": {
                 "laqa_enabled": settings.is_laqa_enabled(),
                 "intent": laqa_output.get("intent"),
@@ -125,6 +134,7 @@ def handle_query(user_query: str):
 if __name__ == "__main__":
     print("\n" + "═" * 66)
     print("  \033[1m🧠  Oncology AI Assistant  |  MRL 512-dim + BM25\033[0m")
+    print("  \033[33m⚠️  RESEARCH & EDUCATIONAL USE ONLY — NOT FOR CLINICAL DIAGNOSIS\033[0m")
     print("═" * 66)
     print("  Type 'exit' to quit\n")
 
@@ -167,12 +177,47 @@ if __name__ == "__main__":
             if treatment:
                 print(f"  \033[1mTreatment:\033[0m {treatment}")
 
-        # Step 3: Agent Answer
+        # Step 3: Agent Answer & Response Optimization Layer
+        raw_ans = result.get("raw_answer", "")
+        opt_ans = result.get("answer", "")
+        opt_stats = result.get("optimization_stats", {})
+
         print("\n" + "─" * 66)
-        print("  \033[1mStep 3 · Agent Answer\033[0m")
+        print("  \033[1mStep 3 · Response Synthesis & Optimization Layer\033[0m")
         print("─" * 66)
-        print("\n\033[1m🩺 Answer:\033[0m\n")
-        print(result["answer"])
+
+        print("\n  \033[1;33m📄 [1] Without Response Optimization (Raw LLM Output):\033[0m")
+        print("  " + "┄" * 62)
+        if raw_ans:
+            for line in raw_ans.strip().splitlines():
+                print(f"  {line}")
+        else:
+            print("  (No raw output recorded)")
+
+        print("\n  \033[1;32m✨ [2] With Response Optimization (Refined Clinical Output):\033[0m")
+        print("  " + "┄" * 62)
+        if opt_ans:
+            for line in opt_ans.strip().splitlines():
+                print(f"  {line}")
+        else:
+            print("  (No optimized output available)")
+
+        print("\n  \033[1;36m📊 [3] Optimization Diagnostics:\033[0m")
+        print("  " + "┄" * 62)
+        raw_c = opt_stats.get("raw_chars", len(raw_ans))
+        opt_c = opt_stats.get("optimized_chars", len(opt_ans))
+        red_p = opt_stats.get("reduction_percent", 0.0)
+        art_s = opt_stats.get("artifacts_stripped", 0)
+        dup_r = opt_stats.get("duplicate_lines_removed", 0)
+        struct_t = opt_stats.get("structure_type", qa.get("query_type", "general"))
+
+        ent_p = opt_stats.get("entities_polished", 0)
+
+        print(f"  • Size Delta          : \033[1m{raw_c}\033[0m chars → \033[1m{opt_c}\033[0m chars ({red_p}% reduction)")
+        print(f"  • Artifacts Stripped  : \033[1m{art_s}\033[0m pattern matches (<think>, prompt echoes, filler)")
+        print(f"  • Duplicates Removed  : \033[1m{dup_r}\033[0m redundant lines")
+        print(f"  • Entities Polished   : \033[1m{ent_p}\033[0m oncology terms/syntax standardizations")
+        print(f"  • Structural Alignment: \033[1m{str(struct_t).capitalize()}\033[0m clinical formatting")
 
         # Step 4: Supporting Evidence
         supporting = result["explanation"].get("supporting_sentences", [])

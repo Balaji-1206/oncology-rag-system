@@ -11,6 +11,10 @@ class AgentMemory:
 
         self.history.append(step)
 
+    def add_step(self, step):
+
+        self.add(step)
+
     # =========================================================
     # 🔹 GET HISTORY
     # =========================================================
@@ -137,7 +141,7 @@ class AgentMemory:
 
         queries = [
 
-            r.get("query", "")
+            r.get("query", "") or r.get("expanded_query", "")
 
             for r in self.history
         ]

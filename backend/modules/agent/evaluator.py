@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import requests
 import numpy as np
@@ -6,6 +7,8 @@ from sentence_transformers import util
 
 import settings
 from modules.embeddings.mrl_embeddings import get_mrl_embedding
+
+logger = logging.getLogger(__name__)
 
 SESSION = requests.Session()
 PHI3MINI_URL = "http://localhost:11434/api/generate"
@@ -167,23 +170,77 @@ Output JSON with exact fields:
             "lexical_grounding_score": round(lexical_grounding, 2),
             "semantic_grounding_score": round(semantic_grounding, 2),
             "contradiction_risk": round(contradiction, 2),
-            "refusal_detected": refusal
+            "refusal_detected": refusal,
+            "is_fallback": False,
+            "evaluator_mode": "llm_evaluator"
         }
 
     except Exception as e:
-        print("❌ EVAL ERROR:", e)
+        logger.warning(
+            "Ollama evaluator call to %s failed (%s); switching to deterministic grounding fallback.",
+            EVAL_MODEL,
+            e
+        )
+        words = answer.strip().split()
+        word_count = len(words)
+        has_text = word_count >= 5
+        grounding = combined_grounding
+
+        # Calibrated evidence-based fallback scoring
+        if grounding >= 0.70 and word_count >= 15:
+            score = 8
+            conf = min(0.78, round(grounding, 2))
+            retry = False
+            risk = "low"
+            rel = round(grounding, 2)
+        elif grounding >= 0.50 and word_count >= 10:
+            score = 7
+            conf = min(0.70, round(grounding, 2))
+            retry = False
+            risk = "low" if grounding >= 0.60 else "medium"
+            rel = round(grounding, 2)
+        elif grounding >= 0.35 and has_text:
+            score = 6
+            conf = 0.60
+            retry = False
+            risk = "medium"
+            rel = round(grounding, 2)
+        elif grounding >= 0.20 and has_text:
+            score = 5
+            conf = 0.48
+            retry = True
+            risk = "medium"
+            rel = round(grounding, 2)
+        elif grounding >= 0.10 and has_text:
+            score = 4
+            conf = 0.35
+            retry = True
+            risk = "high"
+            rel = round(grounding, 2)
+        else:
+            score = 2
+            conf = 0.20
+            retry = True
+            risk = "high"
+            rel = 0.20
+
+        eval_retrieval = max(0.0, min(1.0, (0.55 * grounding) + (0.25 * rel) + (0.20 * conf)))
+
         return {
-            "score": 4,
-            "confidence": 0.4,
-            "needs_retry": True,
-            "answered_question": False,
-            "answer_relevance": 0.35,
-            "hallucination_risk": "medium",
-            "missing_information": True,
-            "grounding_score": 0.1,
-            "retrieval_score": 0.1,
-            "lexical_grounding_score": 0.1,
-            "semantic_grounding_score": 0.0,
-            "contradiction_risk": 0.2,
-            "refusal_detected": False
+            "score": score,
+            "confidence": round(conf, 2),
+            "needs_retry": retry,
+            "answered_question": has_text,
+            "answer_relevance": round(rel, 2),
+            "hallucination_risk": risk,
+            "missing_information": (score < 7),
+            "grounding_score": round(grounding, 2),
+            "retrieval_score": round(eval_retrieval, 2),
+            "lexical_grounding_score": round(lexical_grounding, 2),
+            "semantic_grounding_score": round(semantic_grounding, 2),
+            "contradiction_risk": 0.05,
+            "refusal_detected": False,
+            "is_fallback": True,
+            "evaluator_mode": "grounding_fallback",
+            "fallback_reason": str(e)
         }

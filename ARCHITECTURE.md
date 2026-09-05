@@ -27,7 +27,7 @@ This document provides a detailed architectural specification of the **Oncology 
 │   • Semantic Boosting (Entity, Definition, Section,      │
 │     Metadata Match, minus Noise Penalty)                 │
 │   • Diversity Filter (Diversity threshold < 0.60)        │
-│   • CrossEncoder Reranking (ms-marco-MiniLM-L-6-v2)      │
+│   • CrossEncoder Reranking (BAAI/bge-reranker-large)     │
 └────────────────────────┬─────────────────────────────────┘
                          │
                          ▼
@@ -102,7 +102,7 @@ This document provides a detailed architectural specification of the **Oncology 
   4. **Diversity Filter**:
      - Deduplicates candidate chunks using 60% token overlap threshold (`diversify_results`).
   5. **Reranking**:
-     - `backend/modules/retrieval/reranker.py` utilizes `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+     - `backend/modules/retrieval/reranker.py` utilizes `BAAI/bge-reranker-large`.
      - Final document score formula:
        $$\text{Score}_{\text{final}} = 0.70 \times \text{Score}_{\text{semantic}} + 0.20 \times \text{Score}_{\text{reranker}} + 0.10 \times \text{Score}_{\text{metadata}}$$
 
@@ -125,16 +125,27 @@ This document provides a detailed architectural specification of the **Oncology 
 
 ---
 
-### 2.5 Generator & XAI Explainability Layer
+### 2.5 Generator & Response Optimization Layer
 - **Locations**:
   - `backend/modules/generator/medgemma.py`
-  - `backend/modules/xai/explain.py`
+  - `backend/modules/optimization/response_optimizer.py`
 - **Functionality**:
-  - **MedGemma**: Specialised LLM prompt template enforcing strict medical evidence grounding and non-hallucination.
-  - **XAI Extractor**:
-    - Scans generated answer sentences against retrieved document chunks.
-    - Extracts exact supporting sentences (`supporting_sentences`).
-    - Constructs step-by-step reasoning trace (`reasoning`).
+  - **MedGemma**: Specialized LLM prompt template enforcing strict medical evidence grounding and direct clinical answers.
+  - **Response Optimization Layer**:
+    - Strips thinking tokens (`<think>`, `<analysis>`, `<reasoning>`), prompt echo markers (`"the user wants"`, `"system prompt"`), and noisy chain-of-thought prefixes.
+    - Prunes repetitive sentences and redundant bullet points.
+    - Applies clinical typography and intent-aware structural formatting (`•` bullet hierarchies, clean capitalization, numbered lists).
+    - Computes real-time optimization diff diagnostics (character delta, reduction percentage, stripped artifact counts).
+
+---
+
+### 2.6 XAI Explainability Layer
+- **Location**: `backend/modules/xai/explain.py`
+- **Functionality**:
+  - Scans generated answer sentences against retrieved document chunks.
+  - Extracts exact supporting sentences (`supporting_sentences`).
+  - Constructs step-by-step reasoning trace (`reasoning`).
+  - Calibrates final confidence score.
 
 ---
 

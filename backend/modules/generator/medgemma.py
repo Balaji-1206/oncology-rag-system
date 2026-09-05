@@ -2,6 +2,7 @@ import requests
 import re
 import os
 import settings
+from modules.optimization.response_optimizer import optimize_response
 
 SESSION = requests.Session()
 
@@ -914,23 +915,32 @@ def build_direct_generation_options(query_type="general"):
 # =========================================================
 # 🔹 MAIN GENERATOR
 # =========================================================
-def generate_answer(agent_output):
+def generate_answer(
+    agent_output=None,
+    query=None,
+    docs=None,
+    intent=None,
+    query_type=None,
+    query_metadata=None,
+    keywords=None,
+    **kwargs
+):
 
-    query_data = agent_output["query"]
+    if agent_output is not None and isinstance(agent_output, dict):
+        query_data = agent_output.get("query", {})
+        if isinstance(query_data, dict):
+            query = query or query_data.get("original_query", "") or query_data.get("expanded_query", "")
+            intent = intent or query_data.get("intent", "factual")
+            query_type = query_type or query_data.get("query_type", "general")
+            query_metadata = query_metadata or query_data.get("query_metadata", {})
+            keywords = keywords or query_data.get("keywords", [])
+        elif isinstance(query_data, str):
+            query = query or query_data
+        docs = docs or agent_output.get("context", []) or agent_output.get("docs", [])
 
-    query = query_data["original_query"]
-
-    intent = query_data.get(
-        "intent",
-        "factual"
-    )
-
-    query_type = query_data.get(
-        "query_type",
-        "general"
-    )
-
-    docs = agent_output["context"]
+    intent = intent or "factual"
+    query_type = query_type or "general"
+    docs = docs or []
 
     if settings.is_rag_enabled():
 
@@ -987,40 +997,28 @@ def generate_answer(agent_output):
             "response",
             ""
         )
-        # print(repr(raw_answer))
-        
-        print("\n[GENERATOR] RAW ANSWER:")
-        print(raw_answer)
 
-        if settings.is_rag_enabled():
+        opt_result = optimize_response(
+            raw_answer=raw_answer,
+            query=query,
+            docs=docs,
+            intent=intent,
+            query_type=query_type,
+            is_rag=settings.is_rag_enabled()
+        )
 
-            answer = clean_output(
-                raw_answer
-            )
+        final_answer = opt_result["optimized_answer"]
+        raw_out = opt_result["raw_answer"]
+        opt_stats = opt_result["diagnostics"]
 
-        else:
+        if not opt_result["is_valid"]:
+            print("⚠️ Response optimization validation failed")
 
-            answer = clean_direct_output(
-                raw_answer
-            )
-
-        if not answer.strip():
-
-            return (
-                "Unable to generate a medical answer."
-            )
-
-        if not validate_answer(answer):
-
-            print(
-                "⚠️ Validation failed"
-            )
-
-            return (
-                "Unable to generate a reliable medical answer."
-            )
-
-        return answer.strip()
+        return {
+            "answer": final_answer,
+            "raw_answer": raw_out,
+            "optimization_stats": opt_stats
+        }
 
     except Exception as e:
 
@@ -1029,6 +1027,15 @@ def generate_answer(agent_output):
             e
         )
 
-        return (
-            "Unable to generate a medical answer."
-        )
+        return {
+            "answer": "Unable to generate a medical answer.",
+            "raw_answer": "",
+            "optimization_stats": {
+                "raw_chars": 0,
+                "optimized_chars": 0,
+                "reduction_percent": 0.0,
+                "artifacts_stripped": 0,
+                "duplicate_lines_removed": 0
+            }
+        }
+

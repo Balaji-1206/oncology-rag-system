@@ -2,7 +2,10 @@
 
 **An Intelligent, Evidence-Grounded Medical Retrieval-Augmented Generation System for Oncology Research & Clinical Decision Support.**
 
-Oncology Agentic RAG integrates advanced query prep (**LAQA**), hybrid vector-keyword retrieval (**MRL FAISS + BM25**), cross-encoder reranking, specialized medical LLMs (**MedGemma**), automated response evaluation with retry loops, and an **Explainable AI (XAI)** layer.
+> [!IMPORTANT]
+> **Clinical Research Disclaimer**: This system is developed strictly for research, educational exploration, and academic benchmarking. It is not certified for direct medical diagnosis, treatment planning, or autonomous clinical decision support. Always consult a qualified oncologist or physician for clinical care.
+
+Oncology Agentic RAG integrates advanced query prep (**LAQA**), hybrid vector-keyword retrieval (**MRL FAISS + BM25**), cross-encoder reranking (**BAAI/bge-reranker-large**), specialized medical LLMs (**MedGemma**), automated response evaluation with retry loops, and an **Explainable AI (XAI)** layer.
 
 ---
 
@@ -10,7 +13,7 @@ Oncology Agentic RAG integrates advanced query prep (**LAQA**), hybrid vector-ke
 
 - 🏥 **Clinical Query Expansion (LAQA)** — Language-Aware Query Analyzer parses intent, medical category (treatment, diagnosis, symptoms, prognosis), cancer type, and expands short clinical queries into rich prompts.
 - ⚡ **Dual Indexing & Matryoshka Embeddings (MRL)** — Supports instant switching between MRL 512-dim (minimal, high speed) and Full 768-dim vector stores without reindexing.
-- 🔍 **Hybrid Retrieval & Reranking** — Fuses dense semantic vector search (FAISS) with sparse BM25 keyword search, boosted by medical entity matching and section alignment, then reranked via CrossEncoder.
+- 🔍 **Hybrid Retrieval & Reranking** — Fuses dense semantic vector search (Nomic Embed v1.5 MRL) with sparse BM25 keyword search, boosted by medical entity matching and section alignment, then reranked via CrossEncoder (`BAAI/bge-reranker-large`).
 - 🩺 **MedGemma Generator** — Medical-specialized LLM produces evidence-backed, structured clinical answers.
 - 🔁 **Evaluator-Driven Retry Loop** — Autonomous verification checks grounding score, retrieval quality, answer relevance, and hallucination risk (Low/Medium/High), automatically retrying up to 3 times if quality falls below thresholds.
 - 💡 **XAI & Supporting Evidence Trace** — Generates step-by-step explainability traces and extracts exact supporting evidence sentences from retrieved documents.
@@ -88,13 +91,15 @@ oncology-agentic-rag/
 │   │   │   └── laqa.py             # Language-Aware Query Analyzer
 │   │   ├── retrieval/
 │   │   │   ├── hybrid_retriever.py # FAISS + BM25 Hybrid Retriever
-│   │   │   └── reranker.py         # CrossEncoder Document Reranker
+│   │   │   └── reranker.py         # CrossEncoder Document Reranker (BAAI/bge-reranker-large)
 │   │   ├── chunking/
-│   │   │   └── chunker.py          # Agentic Medical Document Chunker
+│   │   │   └── chunker.py          # Clinical Sentence-Sliding Window Chunker & Classifier
 │   │   ├── embeddings/
-│   │   │   └── mrl_embeddings.py   # MRL Dynamic Embedding Generator
+│   │   │   └── mrl_embeddings.py   # MRL Dynamic Embedding Generator (Nomic v1.5)
 │   │   ├── generator/
 │   │   │   └── medgemma.py         # MedGemma LLM Generation Interface
+│   │   ├── optimization/
+│   │   │   └── response_optimizer.py # Deterministic Post-Generation Sanitization & Formatting
 │   │   └── xai/
 │   │       └── explain.py          # Explainable AI (XAI) Sentence Extractor
 │   │

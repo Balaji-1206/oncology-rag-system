@@ -2,7 +2,20 @@ import argparse
 import json
 import math
 import os
+import sys
 from typing import Any, Dict, List, Optional, Tuple
+
+# Ensure UTF-8 encoding for Windows console output (prevents UnicodeEncodeError on emojis / math symbols)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 import numpy as np
 from scipy import stats
@@ -235,6 +248,26 @@ def paired_statistics(series_a: List[float], series_b: List[float]) -> Dict[str,
     }
 
 
+CONTEXT_DEPENDENT_METRICS = {
+    "faithfulness",
+    "grounding_score",
+    "context_rel",
+    "context_relevancy",
+    "retrieval_score",
+    "precision_at_5",
+    "recall_at_5",
+    "mrr",
+    "ndcg_at_5",
+    "hit_rate",
+    "retrieval_latency",
+}
+
+
+def is_direct_llm_file(path: str) -> bool:
+    """Checks if an experiment path is a direct LLM baseline (no retrieval)."""
+    return "direct_llm" in os.path.basename(path).lower()
+
+
 def run_paired_t_test(path_a: str, path_b: str, metric_name: str) -> Dict[str, Any]:
     records_a = load_json_records(path_a)
     records_b = load_json_records(path_b)
@@ -243,6 +276,15 @@ def run_paired_t_test(path_a: str, path_b: str, metric_name: str) -> Dict[str, A
         raise ValueError(f"No records found in experiment A file: {path_a}")
     if not records_b:
         raise ValueError(f"No records found in experiment B file: {path_b}")
+
+    metric_lower = metric_name.lower().strip()
+    if (is_direct_llm_file(path_a) or is_direct_llm_file(path_b)) and metric_lower in CONTEXT_DEPENDENT_METRICS:
+        raise ValueError(
+            f"Metric '{metric_name}' is context/retrieval-dependent. Direct LLM mode does not perform retrieval "
+            f"or context injection (grounding/retrieval metrics are N/A for Direct LLM). "
+            f"Use generation metrics (e.g. 'bleu4', 'rougeL', 'meteor', 'bertscore', 'sbert_similarity', 'answer_rel') "
+            f"when comparing against Direct LLM."
+        )
 
     common_ids, series_a, series_b, skipped_missing_metric = collect_paired_series(
         records_a,
@@ -388,8 +430,8 @@ def print_report(result: Dict[str, Any]) -> None:
         print("Interpretation")
         print("")
         print("Small Effect     : |d| < 0.20")
-        print("Medium Effect    : |d| ≈ 0.50")
-        print("Large Effect     : |d| ≥ 0.80")
+        print("Medium Effect    : |d| ~= 0.50")
+        print("Large Effect     : |d| >= 0.80")
         print("")
         observed = _effect_size_label(result["cohens_d"])
         _print_kv("Observed Effect", observed)
@@ -399,8 +441,8 @@ def print_report(result: Dict[str, Any]) -> None:
         print("Interpretation")
         print("")
         print("Small Effect     : |d| < 0.20")
-        print("Medium Effect    : |d| ≈ 0.50")
-        print("Large Effect     : |d| ≥ 0.80")
+        print("Medium Effect    : |d| ~= 0.50")
+        print("Large Effect     : |d| >= 0.80")
         print("")
         _print_kv("Observed Effect", "Large")
     print("")

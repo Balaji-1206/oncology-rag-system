@@ -221,6 +221,52 @@ def calibrate_confidence(score):
 
 
 # =========================================================
+# 🔹 SCORE CANDIDATES
+# =========================================================
+def score_candidates(
+    query,
+    docs,
+    query_type=None
+):
+    if not docs:
+        return []
+
+    valid_pairs = []
+    index_map = []
+    for idx, d in enumerate(docs):
+        text = str(d or "").strip()
+        if text:
+            valid_pairs.append([query, text])
+            index_map.append(idx)
+
+    if not valid_pairs:
+        return []
+
+    scores = reranker.predict(
+        valid_pairs,
+        batch_size=8
+    )
+
+    results = []
+    for orig_idx, pair, base_score in zip(index_map, valid_pairs, scores):
+        doc = pair[1]
+        penalty = (
+            noise_penalty(doc, query_type=query_type)
+            + length_penalty(doc)
+        )
+        final_score = float(base_score) - penalty
+        calibrated = calibrate_confidence(final_score)
+        results.append({
+            "candidate_index": orig_idx,
+            "doc": doc,
+            "reranker_score": calibrated,
+            "raw_score": float(base_score)
+        })
+
+    return results
+
+
+# =========================================================
 # 🔹 RERANK
 # =========================================================
 def rerank(

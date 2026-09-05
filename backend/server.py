@@ -34,6 +34,8 @@ def safe_response(result):
 
     return {
         "answer": result.get("answer", ""),
+        "raw_answer": result.get("raw_answer", ""),
+        "optimization_stats": result.get("optimization_stats", {}),
         "confidence": result.get("confidence", 0.5),
         "reasoning": explanation.get("reasoning", ""),
         "supporting_sentences": explanation.get("supporting_sentences", []),
@@ -56,6 +58,10 @@ def safe_response(result):
             "query_metadata": query_analysis.get("query_metadata", {})
         },
         "metrics": metrics,
+        "disclaimer": (
+            "For research and educational purposes only. "
+            "Not certified for direct clinical diagnosis or medical decision support."
+        ),
         "settings": settings.public_settings()
     }
 

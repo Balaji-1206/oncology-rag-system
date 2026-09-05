@@ -321,10 +321,13 @@ def prime_mrl_embedding_cache(
 # =========================================================
 def get_dynamic_mrl_embedding(
     texts,
-    intent="factual"
+    intent="factual",
+    target_dim=None,
+    dim=None,
+    **kwargs
 ):
 
-    active_dim = settings.effective_embedding_dimension()
+    active_dim = target_dim or dim or settings.effective_embedding_dimension()
 
     if settings.is_mrl_enabled():
 
@@ -345,3 +348,4 @@ def get_dynamic_mrl_embedding(
         show_progress_bar=False,
         log=False
     )
+

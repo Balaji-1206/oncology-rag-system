@@ -589,6 +589,35 @@ input:disabled{
     backdrop-filter:blur(16px);
 }
 
+.clinical-disclaimer-banner{
+    position:relative;
+    z-index:4;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:7px 20px;
+    background:rgba(232,178,69,0.06);
+    border-bottom:1px solid rgba(232,178,69,0.18);
+    color:var(--warn);
+    font-size:11px;
+    font-weight:500;
+    letter-spacing:0.15px;
+    text-align:center;
+}
+
+.clinical-disclaimer-banner strong{
+    font-weight:700;
+    color:#f7d58b;
+}
+
+.clinical-disclaimer-banner svg{
+    width:13px;
+    height:13px;
+    flex-shrink:0;
+    color:var(--warn);
+}
+
 .menu-toggle{
     display:none;
     width:38px;
@@ -2350,6 +2379,15 @@ input:disabled{
                 <div class="badge">Oncology RAG</div>
             </div>
         </header>
+
+        <div class="clinical-disclaimer-banner" role="note" aria-label="Clinical Disclaimer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span><strong>Research & Educational Use Only:</strong> This oncology intelligence prototype is for academic research and evaluation. It is not approved for direct clinical decision-making or diagnosis. Consult a qualified oncologist for clinical advice.</span>
+        </div>
 
         <section class="chat-area" id="chatArea">
             <div class="chat-wrapper" id="chatWrapper"></div>

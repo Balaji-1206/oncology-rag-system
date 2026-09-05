@@ -52,3 +52,6 @@ backend/dockling/
 *.log
 *.bin
 *.gguf
+
+# Antigravity Local Development Agents, Plugins & Skills (Superpowers)
+.agents/

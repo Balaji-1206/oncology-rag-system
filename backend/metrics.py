@@ -514,21 +514,33 @@ def recall_at_k(chunks, query, k=5, candidate_pool=None, threshold=None):
     """
     Recall@K = (# relevant documents retrieved in top K) /
     (# relevant documents available in candidate pool).
-    Without manual labels or a fully judged corpus, candidate_pool is the
-    evaluator-visible retrieved pool, so this is proxy recall.
+
+    Proxy recall requires a candidate pool strictly larger than the top-K retrieved chunks
+    (e.g., the pre-reranked candidate set). If candidate_pool is None, empty, or identical
+    to chunks, recall cannot be computed without circular self-comparison (which trivially yields 1.0)
+    and 0.0 is returned with a warning.
     """
     try:
+        if not chunks:
+            return 0.0
+
+        if candidate_pool is None or len(candidate_pool) <= len(chunks):
+            warnings.warn(
+                "recall_at_k requires a candidate_pool strictly larger than chunks to compute proxy recall.",
+                UserWarning,
+                stacklevel=2
+            )
+            return 0.0
+
         retrieved_labels = semantic_relevance_labels(
             query,
             chunks,
             threshold
         )
 
-        pool = candidate_pool if candidate_pool is not None else chunks
-
         pool_labels = semantic_relevance_labels(
             query,
-            pool,
+            candidate_pool,
             threshold
         )
 
@@ -537,7 +549,7 @@ def recall_at_k(chunks, query, k=5, candidate_pool=None, threshold=None):
         if relevant_available == 0:
             return 0.0
 
-        return sum(retrieved_labels[:k]) / relevant_available
+        return min(1.0, sum(retrieved_labels[:k]) / relevant_available)
 
     except Exception:
         return 0.0
