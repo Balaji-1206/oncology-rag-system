@@ -78,6 +78,18 @@ def clean_query(text: str) -> str:
         "opdivo": "nivolumab",
         "herceptin": "trastuzumab",
 
+        # Precision oncology biomarkers & targeted therapies
+        "kras g12c": "kras g12c inhibitor sotorasib adagrasib",
+        "braf v600e": "braf v600e dabrafenib trametinib",
+        "msi-h": "microsatellite instability high msi-h dmmr",
+        "dmmr": "mismatch repair deficient dmmr msi-h",
+        "adc": "antibody drug conjugate",
+        "enhertu": "trastuzumab deruxtecan enhertu",
+        "tagrisso": "osimertinib tagrisso egfr",
+        "imfinzi": "durvalumab imfinzi pd-l1",
+        "tecentriq": "atezolizumab tecentriq pd-l1",
+        "lynparza": "olaparib lynparza parp",
+
         # Diagnostic abbreviations
         "mri": "magnetic resonance imaging",
         "ct scan": "computed tomography scan",
@@ -282,7 +294,7 @@ QUERY:
                     "num_predict": 40, "keep_alive": "20m"
                 }
             },
-            timeout=20
+            timeout=2.5
         )
         text = response.json().get("response", "").strip()
         if len(text) > 5:

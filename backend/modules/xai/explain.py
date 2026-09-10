@@ -54,30 +54,29 @@ def contradiction_risk(
     answer,
     docs
 ):
+    try:
+        from modules.clinical.negation_detector import detect_clinical_contradiction
+        context_str = " ".join([str(d) for d in (docs or [])])
+        has_contra, risk_val, _ = detect_clinical_contradiction(answer, context_str)
+        if has_contra:
+            return risk_val
+    except Exception:
+        pass
 
     negative_patterns = [
-
         "not associated",
-
         "no evidence",
-
         "unclear",
-
         "not proven",
-
         "limited evidence",
-
         "controversial",
     ]
 
     answer_lower = answer.lower()
-
-    context = " ".join(docs).lower()
-
+    context = " ".join([str(d) for d in (docs or [])]).lower()
     risk = 0
 
     for p in negative_patterns:
-
         if p in context and p not in answer_lower:
             risk += 1
 
@@ -940,5 +939,14 @@ def generate_explanation(
         answer,
         docs
     )
+
+    try:
+        from modules.clinical.negation_detector import detect_clinical_contradiction
+        context_str = " ".join([str(d) for d in (docs or [])])
+        has_contra, _, contra_reasons = detect_clinical_contradiction(answer, context_str)
+        if has_contra and contra_reasons:
+            explanation["contraindication_warnings"] = contra_reasons
+    except Exception:
+        pass
 
     return explanation

@@ -2,6 +2,7 @@ import time
 import numpy as np
 from threading import Lock
 from modules.embeddings.mrl_embeddings import get_mrl_embedding
+from modules.security.phi_scrubber import scrub_phi
 
 # =========================================================
 # 🔹 SEMANTIC QUERY VECTOR CACHE
@@ -27,8 +28,10 @@ def lookup_semantic_cache(query_text, threshold=SIMILARITY_THRESHOLD):
         if not _SEMANTIC_CACHE:
             return None
 
+        clean_query, _ = scrub_phi(query_text.strip())
+
         # Compute query vector
-        query_vec = get_mrl_embedding(query_text.strip(), log=False)[0]
+        query_vec = get_mrl_embedding(clean_query, log=False)[0]
 
         # Stack cached vectors
         cached_vecs = np.array([item["vector"] for item in _SEMANTIC_CACHE], dtype=np.float32)
@@ -60,7 +63,8 @@ def add_to_semantic_cache(query_text, result_payload):
     if not query_text or not result_payload:
         return
 
-    query_vec = get_mrl_embedding(query_text.strip(), log=False)[0]
+    clean_query, _ = scrub_phi(query_text.strip())
+    query_vec = get_mrl_embedding(clean_query, log=False)[0]
 
     with _CACHE_LOCK:
         # Evict oldest if full
@@ -68,7 +72,7 @@ def add_to_semantic_cache(query_text, result_payload):
             _SEMANTIC_CACHE.pop(0)
 
         _SEMANTIC_CACHE.append({
-            "query": query_text.strip(),
+            "query": clean_query,
             "vector": query_vec,
             "payload": result_payload,
             "timestamp": time.time()
