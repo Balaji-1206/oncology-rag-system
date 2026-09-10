@@ -5,7 +5,12 @@ import json
 import shutil
 import pickle
 import time
-import faiss
+try:
+    import faiss
+    HAS_FAISS = True
+except (ImportError, Exception) as _err:
+    faiss = None
+    HAS_FAISS = False
 import numpy as np
 from datetime import datetime
 from threading import Lock
@@ -108,20 +113,24 @@ def validate_database_consistency():
     if not os.path.exists(faiss_path):
         raise FileNotFoundError(f"FAISS index not found at {faiss_path}.")
 
-    index = faiss.read_index(faiss_path)
-    expected_dim = settings.effective_embedding_dimension()
+    if HAS_FAISS and faiss is not None:
+        index = faiss.read_index(faiss_path)
+        expected_dim = settings.effective_embedding_dimension()
 
-    if index.d != expected_dim:
-        raise ValueError(f"FAISS dimension mismatch: index has {index.d}, expected {expected_dim}.")
+        if index.d != expected_dim:
+            raise ValueError(f"FAISS dimension mismatch: index has {index.d}, expected {expected_dim}.")
 
-    if metadata.get('embedding_dimension') != index.d:
-        raise ValueError(f"Metadata dimension mismatch: metadata={metadata.get('embedding_dimension')}, FAISS={index.d}")
+        if metadata.get('embedding_dimension') != index.d:
+            raise ValueError(f"Metadata dimension mismatch: metadata={metadata.get('embedding_dimension')}, FAISS={index.d}")
 
     return metadata
 
 
-# Load Database Validation
+# Safe Database Initialization on Import
 print("[INFO] Loading FAISS + BM25 indexes...")
+_DATABASE_LOADED = False
+_DATABASE_INIT_ERROR = None
+
 try:
     metadata = validate_database_consistency()
     db_path = settings.get_database_path()
@@ -129,9 +138,11 @@ try:
     print(f"   Active database: {db_path}")
     print(f"   MRL mode: {'ENABLED' if metadata['mrl_enabled'] else 'DISABLED'}")
     print(f"   Dimension: {metadata['embedding_dimension']}")
-except (FileNotFoundError, ValueError) as e:
-    print(f"[ERROR] Database validation failed: {e}")
-    raise
+    _DATABASE_LOADED = True
+except (FileNotFoundError, ValueError, Exception) as e:
+    _DATABASE_LOADED = False
+    _DATABASE_INIT_ERROR = str(e)
+    print(f"[WARN] Database initialization deferred: {e}")
 
 
 # Global Runtime Cache
@@ -152,7 +163,14 @@ def _reload_all_indexes(verbose=False):
     if verbose:
         print(f"[INFO] Reloading indexes from {db_path}...")
 
-    _CACHE["faiss_index"] = faiss.read_index(f"{db_path}/faiss.index")
+    if HAS_FAISS and faiss is not None and os.path.exists(f"{db_path}/faiss.index"):
+        try:
+            _CACHE["faiss_index"] = faiss.read_index(f"{db_path}/faiss.index")
+        except Exception as exc:
+            print(f"[WARN] Failed to load FAISS index ({exc}). Falling back to sparse retrieval.")
+            _CACHE["faiss_index"] = None
+    else:
+        _CACHE["faiss_index"] = None
 
     try:
         with open(f"{db_path}/bm25.pkl", "rb") as f:
@@ -424,15 +442,15 @@ def hybrid_search(query_payload, k=None):
     t_emb_duration = time.perf_counter() - t_start_emb
 
     t_start_faiss = time.perf_counter()
-    candidate_multiplier = 4
-    search_k = min(retrieval_k * candidate_multiplier, current_faiss.ntotal)
-    dense_scores, dense_indices = current_faiss.search(q_emb, search_k)
-
     dense_candidates = {}
-    for idx, score in zip(dense_indices[0], dense_scores[0]):
-        if idx != -1 and idx < len(current_ids):
-            doc_id = current_ids[idx]
-            dense_candidates[doc_id] = float(score)
+    if current_faiss is not None:
+        candidate_multiplier = 4
+        search_k = min(retrieval_k * candidate_multiplier, current_faiss.ntotal)
+        dense_scores, dense_indices = current_faiss.search(q_emb, search_k)
+        for idx, score in zip(dense_indices[0], dense_scores[0]):
+            if idx != -1 and idx < len(current_ids or []):
+                doc_id = current_ids[idx]
+                dense_candidates[doc_id] = float(score)
     t_faiss_duration = time.perf_counter() - t_start_faiss
 
     # Sparse BM25 Search

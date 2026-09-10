@@ -241,6 +241,29 @@ def agent_decision(laqa_output: dict) -> dict:
             raw_answer = answer
             optimization_stats = {}
 
+        # Circuit breaker: if generator backend is unreachable, don't waste 3 retry loops
+        if answer == "Unable to generate a medical answer.":
+            print("  ⚡ [CIRCUIT BREAKER] Generator service unavailable, failing fast")
+            best_result = {
+                "answer": safe_fallback_answer(),
+                "raw_answer": safe_fallback_answer(),
+                "optimization_stats": optimization_stats,
+                "docs": docs,
+                "context_docs": compressed_docs,
+                "doc_ids": doc_ids,
+                "eval": {
+                    "score": 2,
+                    "confidence": 0.20,
+                    "needs_retry": False,
+                    "retrieval_score": retrieval_score,
+                    "reranker_confidence": reranker_confidence,
+                    "hallucination_risk": "low",
+                    "evaluator_mode": "circuit_breaker"
+                },
+                "candidate_texts": retrieval_result.get("candidate_texts", [])
+            }
+            break
+
         # Evaluation
         eval_result = evaluate_answer(
             query=raw_query_str,

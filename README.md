@@ -277,6 +277,44 @@ python paired_t_test.py
 
 ---
 
+## 🐳 Production Deployment & Enterprise Hardening
+
+The pipeline includes a production-hardened suite designed for enterprise medical AI services:
+
+### 1. One-Command Docker Deployment
+```bash
+docker compose up --build
+```
+Orchestrates:
+- **`rag-api`**: Containerized multi-stage Python 3.10-slim image running non-root `appuser` with OpenMP acceleration and automated health probes.
+- **`ollama`**: Persistent Ollama container for MedGemma LLM inference with volume-mounted model storage.
+
+### 2. Production WSGI Server (`wsgi.py`)
+Run high-throughput multi-threaded serving on Windows or Linux:
+```powershell
+python backend/wsgi.py
+```
+Or via Gunicorn (Linux/Containers):
+```bash
+gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app
+```
+
+### 3. Security, Authentication & HIPAA Compliance
+- **API Key & RBAC**: Pass `X-API-Key: <key>` or `Authorization: Bearer <key>`. Administrative endpoints (`POST /settings/update`) strictly require admin privileges.
+- **HIPAA PHI Redaction Engine**: Automatically scrubs patient names, MRNs, DOBs, phone numbers, and SSNs before caching or pipeline logging.
+- **Security Guardrails**: Rejects adversarial prompt injection attacks, scripts, and out-of-bounds queries.
+- **Rate Limiting**: Sliding-window rate limiter prevents DoS and resource exhaustion.
+
+### 4. Clinical Negation & Contradiction Guardrails
+- **Deterministic Negation Engine**: Scans pairwise assertions between answer and retrieved evidence chunks. Automatically flags contraindications and medical negations, penalizing scores and triggering retry loops.
+
+### 5. Deep Health Checks & Live Observability
+- `GET /health` — Deep diagnostic probing FAISS index files, metadata dimension, and live Ollama latency.
+- `GET /metrics` — Operational telemetry reporting P50/P95/P99 latency, total query counts, cache hit ratio, and error rates.
+- `POST /query/stream` — Server-Sent Events (SSE) endpoint providing real-time token and stage streaming.
+
+---
+
 ## ⚙️ Configuration Parameters
 
 Configuration is managed dynamically via `backend/settings.py` and saved state in `backend/runtime_settings.json`:

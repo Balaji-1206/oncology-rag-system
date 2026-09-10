@@ -7,6 +7,7 @@ from sentence_transformers import util
 
 import settings
 from modules.embeddings.mrl_embeddings import get_mrl_embedding
+from modules.clinical.negation_detector import detect_clinical_contradiction
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ def evaluate_answer(query: str, docs: list, answer: str, retrieval_score: float 
     """Evaluates generated answer for quality, grounding, relevance, and hallucination risk."""
     context = " ".join(docs)
     combined_grounding, lexical_grounding, semantic_grounding = compute_combined_grounding(answer, context)
+    has_contra, contra_risk, contra_reasons = detect_clinical_contradiction(answer, context)
 
     prompt = f"""
 Evaluate this medical QA response against the provided context.
@@ -131,8 +133,14 @@ Output JSON with exact fields:
 
         grounding = combined_grounding
 
-        # Grounding-based adjustments
-        if grounding < 0.20 and score > 5:
+        # Contradiction and Grounding-based adjustments
+        if has_contra:
+            contradiction = max(contradiction, contra_risk)
+            score = min(score, 4)
+            hallucination_risk = "high"
+            retry = True
+            confidence = min(confidence, 0.35)
+        elif grounding < 0.20 and score > 5:
             score = max(score - 3, 3)
             hallucination_risk = "high"
         elif grounding < 0.40 and score > 7:
@@ -140,19 +148,21 @@ Output JSON with exact fields:
 
         # Retry logic
         retry = False
-        if score < 7 or grounding < 0.25 or contradiction > 0.35 or missing_information or insufficient_structure or missing_ranking or has_coverage_gap:
+        if (score < 7 or grounding < 0.25 or contradiction > 0.35 or missing_information 
+                or insufficient_structure or missing_ranking or has_coverage_gap or has_contra):
             retry = True
 
         if refusal and grounding > 0.15:
             retry = True
             score = min(score, 4)
 
-        # High Quality override
-        if (score >= 8 and confidence >= 0.75 and answer_relevance >= 0.75 and grounding >= 0.55 and contradiction <= 0.25
+        # High Quality override (only if NO contradiction)
+        if (not has_contra and score >= 8 and confidence >= 0.75 and answer_relevance >= 0.75 
+                and grounding >= 0.55 and contradiction <= 0.25
                 and not missing_information and not insufficient_structure and not missing_ranking and not has_coverage_gap):
             retry = False
 
-        if confidence > 0.80 and (grounding < 0.70 or answer_relevance < 0.80 or contradiction > 0.20 or missing_information):
+        if confidence > 0.80 and (grounding < 0.70 or answer_relevance < 0.80 or contradiction > 0.20 or missing_information or has_contra):
             confidence = 0.80
 
         _eval_retrieval_score = max(0.0, min(1.0, (0.55 * grounding) + (0.25 * answer_relevance) + (0.20 * confidence)))
@@ -170,6 +180,8 @@ Output JSON with exact fields:
             "lexical_grounding_score": round(lexical_grounding, 2),
             "semantic_grounding_score": round(semantic_grounding, 2),
             "contradiction_risk": round(contradiction, 2),
+            "contradiction_detected": has_contra,
+            "contradiction_reasons": contra_reasons,
             "refusal_detected": refusal,
             "is_fallback": False,
             "evaluator_mode": "llm_evaluator"
@@ -187,7 +199,13 @@ Output JSON with exact fields:
         grounding = combined_grounding
 
         # Calibrated evidence-based fallback scoring
-        if grounding >= 0.70 and word_count >= 15:
+        if has_contra:
+            score = 3
+            conf = 0.25
+            retry = True
+            risk = "high"
+            rel = round(grounding, 2)
+        elif grounding >= 0.70 and word_count >= 15:
             score = 8
             conf = min(0.78, round(grounding, 2))
             retry = False
@@ -238,7 +256,9 @@ Output JSON with exact fields:
             "retrieval_score": round(eval_retrieval, 2),
             "lexical_grounding_score": round(lexical_grounding, 2),
             "semantic_grounding_score": round(semantic_grounding, 2),
-            "contradiction_risk": 0.05,
+            "contradiction_risk": round(contra_risk if has_contra else 0.05, 2),
+            "contradiction_detected": has_contra,
+            "contradiction_reasons": contra_reasons,
             "refusal_detected": False,
             "is_fallback": True,
             "evaluator_mode": "grounding_fallback",

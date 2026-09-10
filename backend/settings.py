@@ -69,10 +69,20 @@ def load_settings():
 
 
 def save_settings(data):
-    """Saves settings configuration to runtime JSON file."""
+    """Saves settings configuration atomically to runtime JSON file."""
     with _LOCK:
-        with open(_SETTINGS_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
+        temp_path = f"{_SETTINGS_PATH}.tmp.{os.getpid()}"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+            os.replace(temp_path, _SETTINGS_PATH)
+        except Exception as exc:
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            raise exc
 
 
 def get_settings():

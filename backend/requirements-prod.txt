@@ -1,0 +1,19 @@
+# Production Pinned Requirements for Oncology Agentic RAG
+flask==3.0.3
+flask-cors==4.0.1
+requests==2.32.3
+numpy==1.26.4
+faiss-cpu==1.8.0.post1
+rank-bm25==0.2.2
+sentence-transformers==3.0.1
+torch==2.3.1
+transformers==4.42.4
+scipy==1.13.1
+PyPDF2==3.0.1
+pymupdf==1.24.9
+nltk==3.8.1
+rouge-score==0.1.2
+bert-score==0.3.13
+tqdm==4.66.4
+waitress==3.0.0
+pytest==8.2.2

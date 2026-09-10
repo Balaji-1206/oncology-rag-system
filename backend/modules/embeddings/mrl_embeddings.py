@@ -43,9 +43,19 @@ def _save_disk_cache(cache_data):
         print(f"[CACHE] Warning: Failed to save disk cache ({e})")
 
 
-_embedding_cache = _load_disk_cache()
-if _embedding_cache:
-    print(f"[CACHE] Loaded {len(_embedding_cache)} cached embeddings from disk.")
+_embedding_cache = None
+
+
+def _get_embedding_cache():
+    """Lazily loads disk cache on first usage."""
+    global _embedding_cache
+    if _embedding_cache is None:
+        with _cache_lock:
+            if _embedding_cache is None:
+                _embedding_cache = _load_disk_cache()
+                if _embedding_cache:
+                    print(f"[CACHE] Loaded {len(_embedding_cache)} cached embeddings from disk.")
+    return _embedding_cache
 
 
 # =========================================================
@@ -133,7 +143,7 @@ def get_mrl_embedding(
     missing_keys = []
 
     if use_cache:
-
+        cache = _get_embedding_cache()
         with _cache_lock:
 
             for text in texts:
@@ -143,9 +153,9 @@ def get_mrl_embedding(
                     text
                 )
 
-                if key in _embedding_cache:
+                if key in cache:
 
-                    cached[key] = _embedding_cache[key]
+                    cached[key] = cache[key]
 
                 else:
 
@@ -228,7 +238,7 @@ def get_mrl_embedding(
         )
 
         if use_cache:
-
+            cache = _get_embedding_cache()
             with _cache_lock:
 
                 for key, vector in zip(
@@ -242,15 +252,15 @@ def get_mrl_embedding(
                     )
 
                     # Evict oldest entry if cache capacity reached
-                    if len(_embedding_cache) >= MAX_CACHE_SIZE:
-                        first_key = next(iter(_embedding_cache))
-                        _embedding_cache.pop(first_key, None)
+                    if len(cache) >= MAX_CACHE_SIZE:
+                        first_key = next(iter(cache))
+                        cache.pop(first_key, None)
 
-                    _embedding_cache[key] = vector
+                    cache[key] = vector
 
                     cached[key] = vector
 
-                _save_disk_cache(_embedding_cache)
+                _save_disk_cache(cache)
 
         else:
 
