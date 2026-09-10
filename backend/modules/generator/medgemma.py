@@ -994,6 +994,9 @@ def generate_answer(
             timeout=45
         )
 
+        if response.status_code != 200:
+            raise RuntimeError(f"Ollama returned HTTP {response.status_code}: {response.text[:200]}")
+
         raw_answer = response.json().get(
             "response",
             ""

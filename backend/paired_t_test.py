@@ -26,8 +26,24 @@ DEFAULT_EXPERIMENT_B = os.path.join("backend", "results", "direct_llm.json")
 DEFAULT_METRIC = "faithfulness"
 
 
+def resolve_experiment_path(path: str) -> str:
+    """Resolves experiment path whether running from repo root or backend dir."""
+    if os.path.exists(path):
+        return path
+    # If running from inside backend/
+    trimmed = path[len("backend"):].lstrip("\\/") if path.startswith("backend") else path
+    if os.path.exists(trimmed):
+        return trimmed
+    # If running from root without backend prefix
+    prefixed = os.path.join("backend", path)
+    if os.path.exists(prefixed):
+        return prefixed
+    return path
+
+
 def load_json_records(path: str) -> List[Dict[str, Any]]:
     """Load an experiment file and normalize it into a list of record dicts."""
+    path = resolve_experiment_path(path)
     if not os.path.exists(path):
         raise FileNotFoundError(f"File not found: {path}")
 

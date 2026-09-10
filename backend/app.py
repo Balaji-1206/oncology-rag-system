@@ -106,6 +106,14 @@ def handle_query(user_query: str):
 
         return {
             "answer": "The oncology AI pipeline encountered an internal processing error.",
+            "raw_answer": "",
+            "optimization_stats": {
+                "raw_chars": 0,
+                "optimized_chars": 0,
+                "reduction_percent": 0.0,
+                "artifacts_stripped": 0,
+                "duplicate_lines_removed": 0
+            },
             "confidence": 0.1,
             "sources": [],
             "source_texts": [],

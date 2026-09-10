@@ -2415,7 +2415,7 @@ function createAIMessage(data, originalQuery) {
                                     Hybrid Retrieval
                                 </div>
                                 <div class="pipeline-step-desc">
-                                    FAISS Vector Search (256d MRL) + Lexical BM25 retrieved <strong>${rawSources.length}</strong> relevant passages.
+                                    FAISS Vector Search (512d MRL) + Lexical BM25 retrieved <strong>${rawSources.length}</strong> relevant passages.
                                 </div>
                             </div>
 
@@ -2786,7 +2786,7 @@ async function runDiagnosticsCheck() {
         if (indexRes) {
             document.getElementById('diagDbVal').textContent = indexRes.active_database || '—';
             document.getElementById('diagDimVal').textContent = indexRes.active_dimension ? `${indexRes.active_dimension}d` : '—';
-            document.getElementById('diagMrlVal').textContent = indexRes.mrl_enabled ? 'Enabled (256d)' : 'Full (768d)';
+            document.getElementById('diagMrlVal').textContent = indexRes.mrl_enabled ? `Enabled (${indexRes.active_dimension || 512}d)` : `Full (${indexRes.active_dimension || 768}d)`;
             document.getElementById('diagIndexVal').innerHTML = indexRes.valid
                 ? '<span style="color: var(--evidence-emerald);">✓ Valid & Synchronized</span>'
                 : '<span style="color: var(--danger-rose);">⚠ Dimension / Index Mismatch</span>';

@@ -178,12 +178,26 @@ def _reload_all_indexes(verbose=False):
     except Exception as exc:
         print(f"[WARN] Failed to load BM25 index ({exc}). Falling back to dense-only retrieval.")
         _CACHE["bm25"] = None
-    with open(f"{db_path}/ids.pkl", "rb") as f:
-        _CACHE["ids"] = pickle.load(f)
-    with open(f"{db_path}/id_to_text.pkl", "rb") as f:
-        _CACHE["id_to_text"] = pickle.load(f)
-    with open(f"{db_path}/chunks.pkl", "rb") as f:
-        raw_chunks = pickle.load(f)
+    try:
+        with open(f"{db_path}/ids.pkl", "rb") as f:
+            _CACHE["ids"] = pickle.load(f)
+    except Exception as exc:
+        print(f"[WARN] Failed to load ids.pkl ({exc}).")
+        _CACHE["ids"] = []
+
+    try:
+        with open(f"{db_path}/id_to_text.pkl", "rb") as f:
+            _CACHE["id_to_text"] = pickle.load(f)
+    except Exception as exc:
+        print(f"[WARN] Failed to load id_to_text.pkl ({exc}).")
+        _CACHE["id_to_text"] = {}
+
+    try:
+        with open(f"{db_path}/chunks.pkl", "rb") as f:
+            raw_chunks = pickle.load(f)
+    except Exception as exc:
+        print(f"[WARN] Failed to load chunks.pkl ({exc}).")
+        raw_chunks = {}
 
     if isinstance(raw_chunks, dict):
         _CACHE["chunk_metadata"] = {
@@ -441,11 +455,13 @@ def hybrid_search(query_payload, k=None):
     q_emb = np.asarray(q_emb, dtype=np.float32).reshape(1, -1)
     t_emb_duration = time.perf_counter() - t_start_emb
 
+    candidate_multiplier = 4
+    search_k = retrieval_k * candidate_multiplier
+
     t_start_faiss = time.perf_counter()
     dense_candidates = {}
     if current_faiss is not None:
-        candidate_multiplier = 4
-        search_k = min(retrieval_k * candidate_multiplier, current_faiss.ntotal)
+        search_k = min(search_k, current_faiss.ntotal)
         dense_scores, dense_indices = current_faiss.search(q_emb, search_k)
         for idx, score in zip(dense_indices[0], dense_scores[0]):
             if idx != -1 and idx < len(current_ids or []):
